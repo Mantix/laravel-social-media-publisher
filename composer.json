@@ -1,0 +1,60 @@
+{
+    "name": "mantix/laravel-social-media-publisher",
+    "description": "Laravel social media auto post package - Complete solution for publishing to 8 major social media platforms",
+    "type": "library",
+    "require": {
+        "laravel/framework": "^12.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.3",
+        "orchestra/testbench": "^10.0"
+    },
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "mantix\\LaravelSocialMediaPublisher\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "mantix\\LaravelSocialMediaPublisher\\Tests\\": "tests/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Mantix BV",
+            "email": "support@mantix.nl",
+            "role": "Owner"
+        },
+        {
+            "name": "Pieter Naber",
+            "email": "Pieter@Mantix.nl",
+            "role": "Developer"
+        }
+    ],
+    "config": {
+        "sort-packages": true
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "mantix\\LaravelSocialMediaPublisher\\SocialShareServiceProvider"
+            ],
+            "aliases": {
+                "FaceBook": "mantix\\LaravelSocialMediaPublisher\\Facades\\FaceBook",
+                "Telegram": "mantix\\LaravelSocialMediaPublisher\\Facades\\Telegram",
+                "Twitter": "mantix\\LaravelSocialMediaPublisher\\Facades\\Twitter",
+                "LinkedIn": "mantix\\LaravelSocialMediaPublisher\\Facades\\LinkedIn",
+                "Instagram": "mantix\\LaravelSocialMediaPublisher\\Facades\\Instagram",
+                "TikTok": "mantix\\LaravelSocialMediaPublisher\\Facades\\TikTok",
+                "YouTube": "mantix\\LaravelSocialMediaPublisher\\Facades\\YouTube",
+                "Pinterest": "mantix\\LaravelSocialMediaPublisher\\Facades\\Pinterest",
+                "SocialMedia": "mantix\\LaravelSocialMediaPublisher\\Facades\\SocialMedia"
+            }
+        }
+    },
+    "minimum-stability": "stable",
+    "scripts": {
+        "test": "phpunit"
+    }
+}
