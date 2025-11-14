@@ -5,6 +5,111 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.3] - 2025-11-14
+
+### ✨ Added
+
+#### OAuth Enhancements
+- **PKCE Support for LinkedIn**: Optional PKCE (Proof Key for Code Exchange) support in `getAuthorizationUrl()` and `handleCallback()` methods
+  - `getAuthorizationUrl()` now accepts `$usePkce` and `$codeVerifier` parameters
+  - Returns array with `['url' => ..., 'code_verifier' => ...]` when PKCE is enabled
+  - Maintains backward compatibility (returns string when PKCE is disabled)
+- **Improved PKCE for Twitter/X**: Enhanced PKCE implementation with better security
+  - Made PKCE optional (defaults to `true` for Twitter/X)
+  - Returns array with code verifier instead of embedding in state parameter
+  - Better session-based storage for code verifier
+- **Refresh Token Methods**: Added `refreshAccessToken()` methods for platforms with refresh tokens
+  - `LinkedInService::refreshAccessToken(string $refreshToken): array`
+  - `TwitterService::refreshAccessToken(string $refreshToken): array`
+- **Token Extension Methods**: Added token extension methods for Facebook and Instagram
+  - `FacebookService::extendAccessToken(string $shortLivedToken): array`
+  - `FacebookService::refreshAccessToken(string $shortLivedToken): array` (alias for consistency)
+  - `InstagramService::extendAccessToken(string $shortLivedToken): array`
+  - `InstagramService::refreshAccessToken(string $shortLivedToken): array` (alias for consistency)
+
+#### LinkedIn Service Enhancements
+- **Organization Methods**: Added methods for managing LinkedIn company pages
+  - `getAdministeredCompanyPages(): array` - Get all company pages user administers (with fallback logic)
+  - `getOrganizationInfo(string $orgId): array` - Get organization information by ID
+- **Enhanced User Profile**: Improved user profile methods
+  - `getUserInfo(?string $projection = null): array` - Now accepts optional custom projection parameter
+  - `getUserProfile(?string $projection = null): array` - New method with simple default projection
+
+### 🔄 Changed
+
+#### OAuth Controller Updates
+- **LinkedIn Callback**: Updated to support PKCE code verifier from session
+- **Twitter/X Callback**: Updated to use session storage for code verifier (more secure)
+- **Refresh Token Storage**: All callbacks now properly save refresh tokens to database
+
+### 📝 Documentation
+
+- **README Updates**: Added comprehensive PKCE examples and refresh token usage guides
+- **OAuth Implementation Plan**: Created detailed `OAUTH_IMPLEMENTATION_PLAN.md` document
+  - Complete feature comparison matrix
+  - Platform-specific OAuth mechanisms explained
+  - Code examples for all scenarios
+  - Security best practices
+  - Testing recommendations
+
+### 🔧 Technical Details
+
+#### PKCE Implementation
+- Code verifier generation: 32-byte random hex string
+- Code challenge: SHA256 hash with Base64 URL encoding (S256 method)
+- Session-based storage for code verifiers (recommended)
+- Backward compatibility maintained for non-PKCE flows
+
+#### Token Management
+- **Refresh Tokens**: LinkedIn and Twitter/X use standard OAuth 2.0 refresh token flow
+- **Token Extension**: Facebook and Instagram use `fb_exchange_token` grant type
+- **Token Storage**: All tokens encrypted in database via `SocialMediaConnection` model
+
+### 🎯 Migration Notes
+
+#### For PKCE Usage (Optional but Recommended)
+
+**Before (v2.0.2)**:
+```php
+// LinkedIn - no PKCE support
+$authUrl = LinkedInService::getAuthorizationUrl($redirectUri);
+return redirect($authUrl);
+
+// Twitter/X - PKCE embedded in state (less secure)
+$authUrl = TwitterService::getAuthorizationUrl($redirectUri);
+return redirect($authUrl);
+```
+
+**After (v2.0.3)**:
+```php
+// LinkedIn - with PKCE (recommended)
+$authData = LinkedInService::getAuthorizationUrl($redirectUri, [], null, true);
+session(['linkedin_code_verifier' => $authData['code_verifier']]);
+return redirect($authData['url']);
+
+// Twitter/X - PKCE enabled by default, returns array
+$authData = TwitterService::getAuthorizationUrl($redirectUri);
+if (is_array($authData)) {
+    session(['twitter_code_verifier' => $authData['code_verifier']]);
+    return redirect($authData['url']);
+}
+```
+
+#### For Token Refresh
+
+**New Methods Available**:
+```php
+// LinkedIn & Twitter/X - Refresh tokens
+$newTokens = LinkedInService::refreshAccessToken($refreshToken);
+$newTokens = TwitterService::refreshAccessToken($refreshToken);
+
+// Facebook & Instagram - Extend tokens
+$longLivedTokens = FacebookService::extendAccessToken($shortLivedToken);
+$longLivedTokens = InstagramService::extendAccessToken($shortLivedToken);
+```
+
+**Note**: This is a non-breaking release. All existing code continues to work. PKCE is optional and backward compatible.
+
 ## [2.0.2] - 2025-11-14
 
 ### 🔄 Changed

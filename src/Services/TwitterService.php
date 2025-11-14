@@ -141,11 +141,18 @@ class TwitterService extends SocialMediaService implements ShareInterface, Share
      * @param string $redirectUri
      * @param string|null $state
      * @param array $scopes
-     * @return string
+     * @param bool $usePkce Enable PKCE flow (Twitter/X requires PKCE for OAuth 2.0, but we make it optional for backward compatibility)
+     * @param string|null $codeVerifier Optional code verifier (will generate if null and PKCE is enabled)
+     * @return string|array Returns string URL if PKCE is disabled, or array with 'url' and 'code_verifier' if PKCE is enabled
      * @throws SocialMediaException
      */
-    public static function getAuthorizationUrl(string $redirectUri, ?string $state = null, array $scopes = ['tweet.read', 'tweet.write', 'users.read', 'offline.access']): string
-    {
+    public static function getAuthorizationUrl(
+        string $redirectUri, 
+        ?string $state = null, 
+        array $scopes = ['tweet.read', 'tweet.write', 'users.read', 'offline.access'],
+        bool $usePkce = true,
+        ?string $codeVerifier = null
+    ) {
         $clientId = config('social_media_publisher.x_client_id');
 
         if (!$clientId) {
@@ -155,27 +162,45 @@ class TwitterService extends SocialMediaService implements ShareInterface, Share
         $state = $state ?? bin2hex(random_bytes(16));
         $scopeString = implode(' ', $scopes);
 
-        // Generate PKCE code verifier and challenge
-        $codeVerifier = bin2hex(random_bytes(32));
-        $codeChallenge = base64_encode(hash('sha256', $codeVerifier, true));
-        $codeChallenge = rtrim(strtr($codeChallenge, '+/', '-_'), '='); // Base64 URL encoding
-
-        // Store code verifier in session or cache for later use in handleCallback
-        // For now, we'll include it in the state parameter (not ideal, but works)
-        // In production, use session or cache storage
-        $stateWithVerifier = base64_encode(json_encode([
-            'state' => $state,
-            'code_verifier' => $codeVerifier,
-        ]));
-
         $authUrl = sprintf(
-            'https://twitter.com/i/oauth2/authorize?response_type=code&client_id=%s&redirect_uri=%s&scope=%s&state=%s&code_challenge=%s&code_challenge_method=S256',
+            'https://twitter.com/i/oauth2/authorize?response_type=code&client_id=%s&redirect_uri=%s&scope=%s&state=%s',
             urlencode($clientId),
             urlencode($redirectUri),
             urlencode($scopeString),
-            urlencode($stateWithVerifier),
-            urlencode($codeChallenge)
+            urlencode($state)
         );
+
+        // Add PKCE support if enabled (recommended for Twitter/X OAuth 2.0)
+        if ($usePkce) {
+            // Generate code verifier if not provided
+            if ($codeVerifier === null) {
+                $codeVerifier = bin2hex(random_bytes(32));
+            }
+
+            // Generate code challenge (S256)
+            $codeChallenge = base64_encode(hash('sha256', $codeVerifier, true));
+            $codeChallenge = rtrim(strtr($codeChallenge, '+/', '-_'), '='); // Base64 URL encoding
+
+            // Add PKCE parameters to authorization URL
+            $authUrl .= '&code_challenge=' . urlencode($codeChallenge) . '&code_challenge_method=S256';
+
+            if (config('social_media_publisher.enable_logging', true)) {
+                Log::info('Twitter/X OAuth authorization URL generated with PKCE', [
+                    'platform' => 'twitter',
+                    'redirect_uri' => $redirectUri,
+                    'scopes' => $scopes,
+                    'state' => $state,
+                    'has_client_id' => !empty($clientId),
+                    'has_code_verifier' => !empty($codeVerifier),
+                ]);
+            }
+
+            // Return array with URL and code verifier
+            return [
+                'url' => $authUrl,
+                'code_verifier' => $codeVerifier,
+            ];
+        }
 
         if (config('social_media_publisher.enable_logging', true)) {
             Log::info('Twitter/X OAuth authorization URL generated', [
@@ -325,6 +350,80 @@ class TwitterService extends SocialMediaService implements ShareInterface, Share
 
         $data = $response->json();
         return $data['data'] ?? [];
+    }
+
+    /**
+     * Refresh access token using refresh token.
+     *
+     * @param string $refreshToken The refresh token.
+     * @return array Response containing new access token and refresh token.
+     * @throws SocialMediaException
+     */
+    public static function refreshAccessToken(string $refreshToken): array
+    {
+        $enableLogging = config('social_media_publisher.enable_logging', true);
+        
+        if ($enableLogging) {
+            Log::info('Twitter/X refresh token initiated', [
+                'platform' => 'twitter',
+                'has_refresh_token' => !empty($refreshToken),
+            ]);
+        }
+
+        $clientId = config('social_media_publisher.x_client_id');
+        $clientSecret = config('social_media_publisher.x_client_secret');
+
+        if (!$clientId || !$clientSecret) {
+            if ($enableLogging) {
+                Log::error('Twitter/X refresh token failed: missing credentials', [
+                    'platform' => 'twitter',
+                    'has_client_id' => !empty($clientId),
+                    'has_client_secret' => !empty($clientSecret),
+                ]);
+            }
+            throw new SocialMediaException('X/Twitter Client ID and Client Secret must be configured.');
+        }
+
+        $tokenUrl = 'https://api.twitter.com/2/oauth2/token';
+        
+        if ($enableLogging) {
+            Log::debug('Refreshing Twitter/X access token', [
+                'platform' => 'twitter',
+                'token_url' => $tokenUrl,
+            ]);
+        }
+        
+        $timeout = config('social_media_publisher.timeout', 30);
+        $response = Http::timeout($timeout)
+            ->withBasicAuth($clientId, $clientSecret)
+            ->asForm()
+            ->post($tokenUrl, [
+                'grant_type' => 'refresh_token',
+                'refresh_token' => $refreshToken,
+            ]);
+
+        if (!$response->successful()) {
+            if ($enableLogging) {
+                Log::error('Twitter/X refresh token failed', [
+                    'platform' => 'twitter',
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                ]);
+            }
+            throw new SocialMediaException('Failed to refresh access token: ' . $response->body());
+        }
+
+        $tokenData = $response->json();
+        
+        if ($enableLogging) {
+            Log::info('Twitter/X access token refreshed successfully', [
+                'platform' => 'twitter',
+                'token_type' => $tokenData['token_type'] ?? 'unknown',
+                'expires_in' => $tokenData['expires_in'] ?? null,
+            ]);
+        }
+
+        return $tokenData;
     }
 
     /**

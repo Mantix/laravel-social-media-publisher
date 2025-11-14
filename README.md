@@ -115,20 +115,48 @@ TELEGRAM_CHAT_ID=your_telegram_chat_id
 You need to create authorization routes that redirect users to the OAuth provider. Add these to your `routes/web.php`:
 
 ```php
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
-use Instagram;
+use mantix\LaravelSocialMediaPublisher\Services\FacebookService;
+use mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
+use mantix\LaravelSocialMediaPublisher\Services\TwitterService;
 
-// OAuth Authorization Routes
+// Facebook OAuth (no PKCE support)
 Route::get('/auth/facebook', function () {
     $redirectUri = route('social-media.facebook.callback');
-    return redirect(FacebookService::getAuthorizationUrl($redirectUri));
+    $authUrl = FacebookService::getAuthorizationUrl($redirectUri);
+    return redirect($authUrl);
 })->name('social-media.facebook.authorize')->middleware('auth');
 
+// LinkedIn OAuth (with optional PKCE)
 Route::get('/auth/linkedin', function () {
     $redirectUri = route('social-media.linkedin.callback');
-    return redirect(LinkedInService::getAuthorizationUrl($redirectUri));
+    
+    // Option 1: Without PKCE (backward compatible)
+    $authUrl = LinkedInService::getAuthorizationUrl($redirectUri);
+    return redirect($authUrl);
+    
+    // Option 2: With PKCE (recommended for security)
+    // $authData = LinkedInService::getAuthorizationUrl($redirectUri, [], null, true);
+    // session(['linkedin_code_verifier' => $authData['code_verifier']]);
+    // return redirect($authData['url']);
 })->name('social-media.linkedin.authorize')->middleware('auth');
+
+// Twitter/X OAuth (with PKCE - recommended)
+Route::get('/auth/twitter', function () {
+    $redirectUri = route('social-media.x.callback');
+    
+    // PKCE is enabled by default for Twitter/X
+    $authData = TwitterService::getAuthorizationUrl($redirectUri);
+    
+    // Store code verifier in session for callback
+    if (is_array($authData)) {
+        session(['twitter_code_verifier' => $authData['code_verifier']]);
+        return redirect($authData['url']);
+    }
+    
+    // Fallback if PKCE is disabled
+    return redirect($authData);
+})->name('social-media.twitter.authorize')->middleware('auth');
 
 // Add similar routes for other platforms...
 ```
@@ -320,19 +348,54 @@ $linkedinService->shareToCompanyPage('Company update!', 'https://example.com');
 
 #### 1. Get Authorization URL
 
+##### Basic OAuth (Without PKCE)
+
 ```php
 use mantix\LaravelSocialMediaPublisher\Services\FacebookService;
-use mantix\LaravelSocialMediaPublisher\Services\FacebookService;
+use mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
 
-// Facebook OAuth
+// Facebook OAuth (no PKCE support)
 $redirectUri = route('social-media.facebook.callback');
 $authUrl = FacebookService::getAuthorizationUrl($redirectUri);
 return redirect($authUrl);
 
-// LinkedIn OAuth
+// LinkedIn OAuth (without PKCE - backward compatible)
 $redirectUri = route('social-media.linkedin.callback');
 $authUrl = LinkedInService::getAuthorizationUrl($redirectUri);
 return redirect($authUrl);
+```
+
+##### OAuth with PKCE (Recommended for LinkedIn and Twitter/X)
+
+```php
+use mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
+use mantix\LaravelSocialMediaPublisher\Services\TwitterService;
+
+// LinkedIn OAuth with PKCE
+$redirectUri = route('social-media.linkedin.callback');
+$authData = LinkedInService::getAuthorizationUrl(
+    $redirectUri,
+    ['r_liteprofile', 'r_emailaddress', 'w_member_social'], // scopes
+    null,  // state (auto-generated if null)
+    true,  // enable PKCE
+    null   // code_verifier (auto-generated if null)
+);
+
+// Store code verifier in session for callback
+session(['linkedin_code_verifier' => $authData['code_verifier']]);
+
+// Redirect to authorization URL
+return redirect($authData['url']);
+
+// Twitter/X OAuth with PKCE (enabled by default)
+$redirectUri = route('social-media.x.callback');
+$authData = TwitterService::getAuthorizationUrl($redirectUri);
+
+// Store code verifier in session
+if (is_array($authData)) {
+    session(['twitter_code_verifier' => $authData['code_verifier']]);
+    return redirect($authData['url']);
+}
 ```
 
 #### 2. OAuth Callbacks (Automatic)
@@ -347,11 +410,107 @@ The default `OAuthController` handles:
 
 **No additional code needed** - just configure the callback URLs in each platform's developer portal (see below).
 
-#### 3. Disconnect from Platform
+#### 3. Refresh Access Tokens
+
+##### For Platforms with Refresh Tokens (LinkedIn, Twitter/X)
+
+```php
+use mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
+use mantix\LaravelSocialMediaPublisher\Services\TwitterService;
+use mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
+
+// Refresh LinkedIn token
+$connection = SocialMediaConnection::where('platform', 'linkedin')
+    ->where('owner_id', $userId)
+    ->first();
+
+if ($connection && $connection->refresh_token) {
+    $refreshToken = $connection->getDecryptedRefreshToken();
+    
+    try {
+        $newTokens = LinkedInService::refreshAccessToken($refreshToken);
+        
+        // Update connection with new tokens
+        $connection->update([
+            'access_token' => $newTokens['access_token'],
+            'refresh_token' => $newTokens['refresh_token'] ?? $refreshToken,
+            'expires_at' => now()->addSeconds($newTokens['expires_in'] ?? 3600),
+        ]);
+    } catch (\Exception $e) {
+        // Handle refresh failure - may need to re-authenticate
+    }
+}
+
+// Refresh Twitter/X token
+$connection = SocialMediaConnection::where('platform', 'twitter')
+    ->where('owner_id', $userId)
+    ->first();
+
+if ($connection && $connection->refresh_token) {
+    $refreshToken = $connection->getDecryptedRefreshToken();
+    $newTokens = TwitterService::refreshAccessToken($refreshToken);
+    
+    $connection->update([
+        'access_token' => $newTokens['access_token'],
+        'refresh_token' => $newTokens['refresh_token'] ?? $refreshToken,
+        'expires_at' => now()->addSeconds($newTokens['expires_in'] ?? 7200),
+    ]);
+}
+```
+
+##### For Platforms with Token Extension (Facebook, Instagram)
 
 ```php
 use mantix\LaravelSocialMediaPublisher\Services\FacebookService;
+use mantix\LaravelSocialMediaPublisher\Services\InstagramService;
+
+// Extend Facebook token (short-lived to long-lived)
+$connection = SocialMediaConnection::where('platform', 'facebook')
+    ->where('owner_id', $userId)
+    ->first();
+
+if ($connection) {
+    $shortLivedToken = $connection->getDecryptedAccessToken();
+    
+    try {
+        // Extend to long-lived token (60 days)
+        $longLivedTokens = FacebookService::extendAccessToken($shortLivedToken);
+        // OR use the alias for consistency
+        // $longLivedTokens = FacebookService::refreshAccessToken($shortLivedToken);
+        
+        $connection->update([
+            'access_token' => $longLivedTokens['access_token'],
+            'expires_at' => now()->addSeconds($longLivedTokens['expires_in'] ?? 5184000), // 60 days
+        ]);
+    } catch (\Exception $e) {
+        // Handle extension failure
+    }
+}
+
+// Extend Instagram token (same as Facebook)
+$connection = SocialMediaConnection::where('platform', 'instagram')
+    ->where('owner_id', $userId)
+    ->first();
+
+if ($connection) {
+    $shortLivedToken = $connection->getDecryptedAccessToken();
+    $longLivedTokens = InstagramService::extendAccessToken($shortLivedToken);
+    
+    $connection->update([
+        'access_token' => $longLivedTokens['access_token'],
+        'expires_at' => now()->addSeconds($longLivedTokens['expires_in'] ?? 5184000),
+    ]);
+}
+```
+
+**Note**: Facebook and Instagram don't use refresh tokens. When a long-lived token expires (after 60 days), users must re-authenticate.
+
+#### 4. Disconnect from Platform
+
+```php
 use mantix\LaravelSocialMediaPublisher\Services\FacebookService;
+use mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
+use mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 
 // Disconnect for a user
 $user = User::find($userId);

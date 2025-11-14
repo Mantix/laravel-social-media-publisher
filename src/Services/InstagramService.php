@@ -245,6 +245,93 @@ class InstagramService extends SocialMediaService implements ShareInterface, Sha
     }
 
     /**
+     * Extend short-lived access token to long-lived access token.
+     * Instagram uses Facebook's token extension system.
+     *
+     * @param string $shortLivedToken The short-lived access token to extend.
+     * @return array Response containing long-lived access token and expiration.
+     * @throws SocialMediaException
+     */
+    public static function extendAccessToken(string $shortLivedToken): array
+    {
+        $enableLogging = config('social_media_publisher.enable_logging', true);
+        
+        if ($enableLogging) {
+            Log::info('Instagram extend token initiated', [
+                'platform' => 'instagram',
+                'has_token' => !empty($shortLivedToken),
+            ]);
+        }
+
+        $clientId = config('social_media_publisher.instagram_client_id') ?? config('social_media_publisher.facebook_client_id');
+        $clientSecret = config('social_media_publisher.instagram_client_secret') ?? config('social_media_publisher.facebook_client_secret');
+
+        if (!$clientId || !$clientSecret) {
+            if ($enableLogging) {
+                Log::error('Instagram extend token failed: missing credentials', [
+                    'platform' => 'instagram',
+                    'has_client_id' => !empty($clientId),
+                    'has_client_secret' => !empty($clientSecret),
+                ]);
+            }
+            throw new SocialMediaException('Instagram/Facebook Client ID and Client Secret must be configured.');
+        }
+
+        $tokenUrl = 'https://graph.facebook.com/v20.0/oauth/access_token';
+        
+        if ($enableLogging) {
+            Log::debug('Extending Instagram access token', [
+                'platform' => 'instagram',
+                'token_url' => $tokenUrl,
+            ]);
+        }
+        
+        $timeout = config('social_media_publisher.timeout', 30);
+        $response = Http::timeout($timeout)->get($tokenUrl, [
+            'grant_type' => 'fb_exchange_token',
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
+            'fb_exchange_token' => $shortLivedToken,
+        ]);
+
+        if (!$response->successful()) {
+            if ($enableLogging) {
+                Log::error('Instagram extend token failed', [
+                    'platform' => 'instagram',
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                ]);
+            }
+            throw new SocialMediaException('Failed to extend access token: ' . $response->body());
+        }
+
+        $tokenData = $response->json();
+        
+        if ($enableLogging) {
+            Log::info('Instagram access token extended successfully', [
+                'platform' => 'instagram',
+                'expires_in' => $tokenData['expires_in'] ?? null,
+            ]);
+        }
+
+        return $tokenData;
+    }
+
+    /**
+     * Refresh access token using refresh token (alias for extendAccessToken for consistency).
+     * Note: Instagram doesn't use refresh tokens, but uses Facebook's token extension instead.
+     * This method is provided for API consistency with other platforms.
+     *
+     * @param string $shortLivedToken The short-lived access token to extend.
+     * @return array Response containing long-lived access token and expiration.
+     * @throws SocialMediaException
+     */
+    public static function refreshAccessToken(string $shortLivedToken): array
+    {
+        return self::extendAccessToken($shortLivedToken);
+    }
+
+    /**
      * Get Facebook pages for the authenticated user.
      *
      * @param string $accessToken

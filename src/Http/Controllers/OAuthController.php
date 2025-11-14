@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Log;
 use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 use mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 use mantix\LaravelSocialMediaPublisher\Services\FacebookService;
+use mantix\LaravelSocialMediaPublisher\Services\InstagramService;
 use mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
 use mantix\LaravelSocialMediaPublisher\Services\TwitterService;
 
@@ -99,13 +100,20 @@ class OAuthController
 
         try {
             $redirectUri = route('social-media.linkedin.callback');
-            $tokenData = LinkedInService::handleCallback($code, $redirectUri);
+            
+            // Retrieve PKCE code verifier from session if PKCE was used
+            $codeVerifier = session('linkedin_code_verifier');
+            
+            $tokenData = LinkedInService::handleCallback($code, $redirectUri, $codeVerifier);
 
             $user = auth()->user();
             
             if (!$user) {
                 return $this->handleError('linkedin', 'not_authenticated', 'User must be authenticated to connect social media accounts');
             }
+
+            // Clear code verifier from session after use
+            session()->forget('linkedin_code_verifier');
 
             // Save connection
             SocialMediaConnection::updateOrCreate(
@@ -118,6 +126,7 @@ class OAuthController
                 [
                     'platform_user_id' => $tokenData['profile']['id'] ?? null,
                     'access_token' => $tokenData['access_token'],
+                    'refresh_token' => $tokenData['refresh_token'] ?? null,
                     'expires_at' => $tokenData['expires_in'] ? now()->addSeconds($tokenData['expires_in']) : null,
                     'metadata' => [
                         'person_urn' => $tokenData['profile']['id'] ?? null,
@@ -147,7 +156,6 @@ class OAuthController
     public function handleXCallback(Request $request)
     {
         $code = $request->get('code');
-        $state = $request->get('state');
         $error = $request->get('error');
         
         if ($error) {
@@ -161,9 +169,13 @@ class OAuthController
         try {
             $redirectUri = route('social-media.x.callback');
             
-            // Extract code verifier from state if present
-            $codeVerifier = null;
-            if ($state) {
+            // Retrieve PKCE code verifier from session (recommended approach)
+            $codeVerifier = session('twitter_code_verifier');
+            
+            // Fallback: Try to extract from state for backward compatibility
+            // (This is less secure and should be avoided in production)
+            if (!$codeVerifier && $request->has('state')) {
+                $state = $request->get('state');
                 $stateData = json_decode(base64_decode($state), true);
                 $codeVerifier = $stateData['code_verifier'] ?? null;
             }
@@ -175,6 +187,9 @@ class OAuthController
             if (!$user) {
                 return $this->handleError('x', 'not_authenticated', 'User must be authenticated to connect social media accounts');
             }
+
+            // Clear code verifier from session after use
+            session()->forget('twitter_code_verifier');
 
             // Save connection
             SocialMediaConnection::updateOrCreate(

@@ -113,11 +113,18 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
      * @param string $redirectUri
      * @param array $scopes
      * @param string|null $state
-     * @return string
+     * @param bool $usePkce Enable PKCE flow
+     * @param string|null $codeVerifier Optional code verifier (will generate if null and PKCE is enabled)
+     * @return string|array Returns string URL if PKCE is disabled, or array with 'url' and 'code_verifier' if PKCE is enabled
      * @throws SocialMediaException
      */
-    public static function getAuthorizationUrl(string $redirectUri, array $scopes = ['r_liteprofile', 'r_emailaddress', 'w_member_social'], ?string $state = null): string
-    {
+    public static function getAuthorizationUrl(
+        string $redirectUri, 
+        array $scopes = ['r_liteprofile', 'r_emailaddress', 'w_member_social'], 
+        ?string $state = null,
+        bool $usePkce = false,
+        ?string $codeVerifier = null
+    ) {
         $clientId = config('social_media_publisher.linkedin_client_id');
 
         if (!$clientId) {
@@ -134,6 +141,38 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
             urlencode($state),
             urlencode($scopeString)
         );
+
+        // Add PKCE support if enabled
+        if ($usePkce) {
+            // Generate code verifier if not provided
+            if ($codeVerifier === null) {
+                $codeVerifier = bin2hex(random_bytes(32));
+            }
+
+            // Generate code challenge (S256)
+            $codeChallenge = base64_encode(hash('sha256', $codeVerifier, true));
+            $codeChallenge = rtrim(strtr($codeChallenge, '+/', '-_'), '='); // Base64 URL encoding
+
+            // Add PKCE parameters to authorization URL
+            $authUrl .= '&code_challenge=' . urlencode($codeChallenge) . '&code_challenge_method=S256';
+
+            if (config('social_media_publisher.enable_logging', true)) {
+                Log::info('LinkedIn OAuth authorization URL generated with PKCE', [
+                    'platform' => 'linkedin',
+                    'redirect_uri' => $redirectUri,
+                    'scopes' => $scopes,
+                    'state' => $state,
+                    'has_client_id' => !empty($clientId),
+                    'has_code_verifier' => !empty($codeVerifier),
+                ]);
+            }
+
+            // Return array with URL and code verifier
+            return [
+                'url' => $authUrl,
+                'code_verifier' => $codeVerifier,
+            ];
+        }
 
         if (config('social_media_publisher.enable_logging', true)) {
             Log::info('LinkedIn OAuth authorization URL generated', [
@@ -153,10 +192,11 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
      *
      * @param string $code
      * @param string $redirectUri
+     * @param string|null $codeVerifier PKCE code verifier (required if PKCE was used in authorization)
      * @return array
      * @throws SocialMediaException
      */
-    public static function handleCallback(string $code, string $redirectUri): array
+    public static function handleCallback(string $code, string $redirectUri, ?string $codeVerifier = null): array
     {
         $enableLogging = config('social_media_publisher.enable_logging', true);
         
@@ -165,6 +205,7 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
                 'platform' => 'linkedin',
                 'redirect_uri' => $redirectUri,
                 'has_code' => !empty($code),
+                'has_code_verifier' => !empty($codeVerifier),
             ]);
         }
 
@@ -190,17 +231,25 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
                 'platform' => 'linkedin',
                 'token_url' => $tokenUrl,
                 'redirect_uri' => $redirectUri,
+                'using_pkce' => !empty($codeVerifier),
             ]);
         }
         
         $timeout = config('social_media_publisher.timeout', 30);
-        $response = Http::timeout($timeout)->asForm()->post($tokenUrl, [
+        $params = [
             'grant_type' => 'authorization_code',
             'code' => $code,
             'redirect_uri' => $redirectUri,
             'client_id' => $clientId,
             'client_secret' => $clientSecret,
-        ]);
+        ];
+
+        // Add PKCE code verifier if provided
+        if ($codeVerifier !== null) {
+            $params['code_verifier'] = $codeVerifier;
+        }
+
+        $response = Http::timeout($timeout)->asForm()->post($tokenUrl, $params);
 
         if (!$response->successful()) {
             if ($enableLogging) {
@@ -281,6 +330,79 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
             'token_type' => $tokenData['token_type'] ?? 'bearer',
             'profile' => $profile,
         ];
+    }
+
+    /**
+     * Refresh access token using refresh token.
+     *
+     * @param string $refreshToken The refresh token.
+     * @return array Response containing new access token and refresh token.
+     * @throws SocialMediaException
+     */
+    public static function refreshAccessToken(string $refreshToken): array
+    {
+        $enableLogging = config('social_media_publisher.enable_logging', true);
+        
+        if ($enableLogging) {
+            Log::info('LinkedIn refresh token initiated', [
+                'platform' => 'linkedin',
+                'has_refresh_token' => !empty($refreshToken),
+            ]);
+        }
+
+        $clientId = config('social_media_publisher.linkedin_client_id');
+        $clientSecret = config('social_media_publisher.linkedin_client_secret');
+
+        if (!$clientId || !$clientSecret) {
+            if ($enableLogging) {
+                Log::error('LinkedIn refresh token failed: missing credentials', [
+                    'platform' => 'linkedin',
+                    'has_client_id' => !empty($clientId),
+                    'has_client_secret' => !empty($clientSecret),
+                ]);
+            }
+            throw new SocialMediaException('LinkedIn Client ID and Client Secret must be configured.');
+        }
+
+        $tokenUrl = 'https://www.linkedin.com/oauth/v2/accessToken';
+        
+        if ($enableLogging) {
+            Log::debug('Refreshing LinkedIn access token', [
+                'platform' => 'linkedin',
+                'token_url' => $tokenUrl,
+            ]);
+        }
+        
+        $timeout = config('social_media_publisher.timeout', 30);
+        $response = Http::timeout($timeout)->asForm()->post($tokenUrl, [
+            'grant_type' => 'refresh_token',
+            'refresh_token' => $refreshToken,
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
+        ]);
+
+        if (!$response->successful()) {
+            if ($enableLogging) {
+                Log::error('LinkedIn refresh token failed', [
+                    'platform' => 'linkedin',
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                ]);
+            }
+            throw new SocialMediaException('Failed to refresh access token: ' . $response->body());
+        }
+
+        $tokenData = $response->json();
+        
+        if ($enableLogging) {
+            Log::info('LinkedIn access token refreshed successfully', [
+                'platform' => 'linkedin',
+                'token_type' => $tokenData['token_type'] ?? 'unknown',
+                'expires_in' => $tokenData['expires_in'] ?? null,
+            ]);
+        }
+
+        return $tokenData;
     }
 
     /**
@@ -642,15 +764,21 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
     /**
      * Get user profile information.
      *
+     * @param string|null $projection Optional custom projection. If not provided, uses default projection.
      * @return array Response from the LinkedIn API.
      * @throws SocialMediaException
      */
-    public function getUserInfo(): array
+    public function getUserInfo(?string $projection = null): array
     {
         try {
             $url = $this->buildApiUrl('people/~');
+            
+            // Use provided projection or default
+            $defaultProjection = '(id,firstName,lastName,profilePicture(displayImage~:playableStreams))';
+            $projection = $projection ?? $defaultProjection;
+            
             $params = [
-                'projection' => '(id,firstName,lastName,profilePicture(displayImage~:playableStreams))'
+                'projection' => $projection
             ];
 
             return $this->sendRequest($url, 'get', $params);
@@ -661,6 +789,225 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
                 'exception' => get_class($e),
             ]);
             throw new SocialMediaException('Failed to get LinkedIn user info: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get user profile with specific projection (alias for getUserInfo with projection).
+     *
+     * @param string|null $projection Optional custom projection. If not provided, uses simple projection.
+     * @return array Response from the LinkedIn API.
+     * @throws SocialMediaException
+     */
+    public function getUserProfile(?string $projection = null): array
+    {
+        // Default to simple projection if not provided
+        $defaultProjection = '(id,localizedFirstName,localizedLastName)';
+        $projection = $projection ?? $defaultProjection;
+        
+        return $this->getUserInfo($projection);
+    }
+
+    /**
+     * Get administered company pages for the authenticated user.
+     *
+     * @return array Array of company pages with 'id' and 'name' keys.
+     * @throws SocialMediaException
+     */
+    public function getAdministeredCompanyPages(): array
+    {
+        try {
+            $pages = [];
+            
+            // Try organizationAcls endpoint with projection first
+            try {
+                $url = $this->buildApiUrl('organizationAcls');
+                $params = [
+                    'q' => 'roleAssignee',
+                    'role' => 'ADMINISTRATOR',
+                    'projection' => '(elements*(organization~(id,localizedName)))',
+                ];
+
+                $response = $this->sendRequest($url, 'get', $params);
+                
+                if (isset($response['elements']) && is_array($response['elements'])) {
+                    foreach ($response['elements'] as $element) {
+                        if (isset($element['organization'])) {
+                            $org = $element['organization'];
+                            $orgId = $org['id'] ?? null;
+                            $orgName = $org['localizedName'] ?? null;
+                            
+                            if ($orgId) {
+                                // Extract numeric ID from URN if needed (e.g., "urn:li:organization:12345" -> "12345")
+                                if (strpos($orgId, 'urn:li:organization:') === 0) {
+                                    $orgId = str_replace('urn:li:organization:', '', $orgId);
+                                }
+                                
+                                $pages[] = [
+                                    'id' => $orgId,
+                                    'name' => $orgName ?? 'Unknown Organization',
+                                ];
+                            }
+                        }
+                    }
+                    
+                    if (!empty($pages)) {
+                        $this->log('info', 'LinkedIn administered company pages retrieved', [
+                            'platform' => 'linkedin',
+                            'count' => count($pages),
+                        ]);
+                        return $pages;
+                    }
+                }
+            } catch (\Exception $e) {
+                $this->log('warning', 'Failed to get company pages via organizationAcls with projection', [
+                    'platform' => 'linkedin',
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            // Fallback: Try organizationAcls without projection
+            try {
+                $url = $this->buildApiUrl('organizationAcls');
+                $params = [
+                    'q' => 'roleAssignee',
+                    'role' => 'ADMINISTRATOR',
+                ];
+
+                $response = $this->sendRequest($url, 'get', $params);
+                
+                if (isset($response['elements']) && is_array($response['elements'])) {
+                    foreach ($response['elements'] as $element) {
+                        if (isset($element['organization'])) {
+                            $orgUrn = $element['organization'];
+                            
+                            // Extract organization ID from URN
+                            if (strpos($orgUrn, 'urn:li:organization:') === 0) {
+                                $orgId = str_replace('urn:li:organization:', '', $orgUrn);
+                                
+                                // Try to get organization name
+                                try {
+                                    $orgInfo = $this->getOrganizationInfo($orgId);
+                                    $orgName = $orgInfo['localizedName'] ?? 'Unknown Organization';
+                                } catch (\Exception $e) {
+                                    $orgName = 'Unknown Organization';
+                                }
+                                
+                                $pages[] = [
+                                    'id' => $orgId,
+                                    'name' => $orgName,
+                                ];
+                            }
+                        }
+                    }
+                    
+                    if (!empty($pages)) {
+                        $this->log('info', 'LinkedIn administered company pages retrieved (fallback)', [
+                            'platform' => 'linkedin',
+                            'count' => count($pages),
+                        ]);
+                        return $pages;
+                    }
+                }
+            } catch (\Exception $e) {
+                $this->log('warning', 'Failed to get company pages via organizationAcls', [
+                    'platform' => 'linkedin',
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            // Final fallback: Try organizationEntityPermissions
+            try {
+                $url = $this->buildApiUrl('organizationEntityPermissions');
+                $params = [
+                    'q' => 'roleAssignee',
+                    'role' => 'ADMINISTRATOR',
+                ];
+
+                $response = $this->sendRequest($url, 'get', $params);
+                
+                if (isset($response['elements']) && is_array($response['elements'])) {
+                    foreach ($response['elements'] as $element) {
+                        if (isset($element['organization'])) {
+                            $orgUrn = $element['organization'];
+                            
+                            // Extract organization ID from URN
+                            if (strpos($orgUrn, 'urn:li:organization:') === 0) {
+                                $orgId = str_replace('urn:li:organization:', '', $orgUrn);
+                                
+                                // Try to get organization name
+                                try {
+                                    $orgInfo = $this->getOrganizationInfo($orgId);
+                                    $orgName = $orgInfo['localizedName'] ?? 'Unknown Organization';
+                                } catch (\Exception $e) {
+                                    $orgName = 'Unknown Organization';
+                                }
+                                
+                                $pages[] = [
+                                    'id' => $orgId,
+                                    'name' => $orgName,
+                                ];
+                            }
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                $this->log('warning', 'Failed to get company pages via organizationEntityPermissions', [
+                    'platform' => 'linkedin',
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            if (empty($pages)) {
+                $this->log('warning', 'No administered company pages found', [
+                    'platform' => 'linkedin',
+                ]);
+            } else {
+                $this->log('info', 'LinkedIn administered company pages retrieved (final fallback)', [
+                    'platform' => 'linkedin',
+                    'count' => count($pages),
+                ]);
+            }
+
+            return $pages;
+        } catch (\Exception $e) {
+            $this->log('error', 'Failed to get LinkedIn administered company pages', [
+                'platform' => 'linkedin',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+            ]);
+            throw new SocialMediaException('Failed to get LinkedIn administered company pages: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get organization information by organization ID.
+     *
+     * @param string $orgId The organization ID (numeric ID, not URN).
+     * @return array Response from the LinkedIn API.
+     * @throws SocialMediaException
+     */
+    public function getOrganizationInfo(string $orgId): array
+    {
+        try {
+            $url = $this->buildApiUrl("organizations/{$orgId}");
+
+            $response = $this->sendRequest($url, 'get');
+            
+            $this->log('info', 'LinkedIn organization info retrieved', [
+                'platform' => 'linkedin',
+                'organization_id' => $orgId,
+            ]);
+            
+            return $response;
+        } catch (\Exception $e) {
+            $this->log('error', 'Failed to get LinkedIn organization info', [
+                'platform' => 'linkedin',
+                'organization_id' => $orgId,
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+            ]);
+            throw new SocialMediaException('Failed to get LinkedIn organization info: ' . $e->getMessage());
         }
     }
 

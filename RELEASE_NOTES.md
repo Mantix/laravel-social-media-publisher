@@ -1,5 +1,269 @@
 # Release Notes
 
+## 🎉 Laravel Social Media Publisher v2.0.3 - OAuth Security & Token Management Enhancements
+
+**Release Date**: January 2025  
+**Version**: 2.0.3  
+**Type**: Minor Release
+
+---
+
+## 🔐 What's New
+
+### PKCE Support (Proof Key for Code Exchange)
+
+Enhanced OAuth security with optional PKCE support for LinkedIn and improved implementation for Twitter/X:
+
+- ✅ **LinkedIn PKCE**: Optional PKCE support for enhanced security
+- ✅ **Twitter/X PKCE**: Improved implementation with better code verifier storage
+- ✅ **Backward Compatible**: All existing code continues to work without changes
+
+### Token Management
+
+Complete token refresh and extension support across all platforms:
+
+- ✅ **Refresh Tokens**: LinkedIn and Twitter/X now support token refresh
+- ✅ **Token Extension**: Facebook and Instagram support token extension (short-lived to long-lived)
+- ✅ **Automatic Storage**: Refresh tokens automatically saved during OAuth callbacks
+
+### LinkedIn Enhancements
+
+New methods for managing LinkedIn company pages and user profiles:
+
+- ✅ **Company Pages**: Get administered company pages with fallback logic
+- ✅ **Organization Info**: Get detailed organization information
+- ✅ **Custom Projections**: Enhanced user profile methods with custom projection support
+
+---
+
+## 🔄 OAuth Improvements
+
+### PKCE Implementation
+
+PKCE (Proof Key for Code Exchange) adds an extra layer of security to OAuth flows by preventing authorization code interception attacks.
+
+#### LinkedIn PKCE (Optional)
+
+```php
+// Enable PKCE for LinkedIn
+$authData = LinkedInService::getAuthorizationUrl(
+    $redirectUri,
+    $scopes,
+    $state,
+    true,  // Enable PKCE
+    null   // Auto-generate code verifier
+);
+
+// Store code verifier in session
+session(['linkedin_code_verifier' => $authData['code_verifier']]);
+
+// Redirect to authorization URL
+return redirect($authData['url']);
+```
+
+#### Twitter/X PKCE (Enabled by Default)
+
+```php
+// PKCE is enabled by default for Twitter/X
+$authData = TwitterService::getAuthorizationUrl($redirectUri);
+
+// Store code verifier in session
+if (is_array($authData)) {
+    session(['twitter_code_verifier' => $authData['code_verifier']]);
+    return redirect($authData['url']);
+}
+```
+
+### Token Refresh
+
+#### For LinkedIn and Twitter/X
+
+```php
+// Refresh LinkedIn token
+$newTokens = LinkedInService::refreshAccessToken($refreshToken);
+
+// Refresh Twitter/X token
+$newTokens = TwitterService::refreshAccessToken($refreshToken);
+
+// Update connection with new tokens
+$connection->update([
+    'access_token' => $newTokens['access_token'],
+    'refresh_token' => $newTokens['refresh_token'] ?? $refreshToken,
+    'expires_at' => now()->addSeconds($newTokens['expires_in'] ?? 3600),
+]);
+```
+
+#### For Facebook and Instagram
+
+```php
+// Extend Facebook token (short-lived to long-lived, 60 days)
+$longLivedTokens = FacebookService::extendAccessToken($shortLivedToken);
+// OR use alias for consistency
+$longLivedTokens = FacebookService::refreshAccessToken($shortLivedToken);
+
+// Extend Instagram token (same as Facebook)
+$longLivedTokens = InstagramService::extendAccessToken($shortLivedToken);
+```
+
+**Note**: Facebook and Instagram don't use refresh tokens. When long-lived tokens expire (after 60 days), users must re-authenticate.
+
+---
+
+## 📚 New LinkedIn Methods
+
+### Get Administered Company Pages
+
+```php
+$linkedinService = LinkedInService::forConnection($connection);
+$companyPages = $linkedinService->getAdministeredCompanyPages();
+
+// Returns array of pages:
+// [
+//     ['id' => '12345', 'name' => 'My Company'],
+//     ['id' => '67890', 'name' => 'Another Company'],
+// ]
+```
+
+### Get Organization Info
+
+```php
+$orgInfo = $linkedinService->getOrganizationInfo('12345');
+// Returns full organization details from LinkedIn API
+```
+
+### Enhanced User Profile
+
+```php
+// Default projection
+$userInfo = $linkedinService->getUserInfo();
+
+// Custom projection
+$userInfo = $linkedinService->getUserInfo('(id,localizedFirstName,localizedLastName)');
+
+// Simple profile method
+$profile = $linkedinService->getUserProfile();
+```
+
+---
+
+## 🔧 OAuth Controller Updates
+
+The default `OAuthController` has been updated to:
+
+- ✅ Support PKCE code verifier retrieval from session
+- ✅ Properly save refresh tokens to database
+- ✅ Clear code verifiers from session after use
+- ✅ Maintain backward compatibility with non-PKCE flows
+
+**No changes required** - The controller automatically handles both PKCE and non-PKCE flows.
+
+---
+
+## 📖 Documentation
+
+### New Documentation
+
+- **OAuth Implementation Plan**: Comprehensive guide (`OAUTH_IMPLEMENTATION_PLAN.md`)
+  - Feature comparison matrix
+  - Platform-specific OAuth mechanisms
+  - Complete code examples
+  - Security best practices
+  - Testing recommendations
+
+### Updated Documentation
+
+- **README.md**: Added PKCE examples and token refresh guides
+- **CHANGELOG.md**: Complete list of all changes
+- **Code Examples**: All examples updated with new methods
+
+---
+
+## 🎯 Migration Guide
+
+### For Existing Users
+
+**No migration required!** This is a non-breaking release. All existing code continues to work.
+
+### Optional: Enable PKCE
+
+If you want to enable PKCE for enhanced security:
+
+1. **Update Authorization Routes**:
+   ```php
+   // LinkedIn with PKCE
+   $authData = LinkedInService::getAuthorizationUrl($redirectUri, [], null, true);
+   session(['linkedin_code_verifier' => $authData['code_verifier']]);
+   return redirect($authData['url']);
+   ```
+
+2. **OAuthController automatically handles PKCE** - no changes needed to callbacks
+
+### Using Token Refresh
+
+If you want to implement automatic token refresh:
+
+```php
+// Check if token is expired
+if ($connection->isExpired() && $connection->refresh_token) {
+    $refreshToken = $connection->getDecryptedRefreshToken();
+    
+    try {
+        $newTokens = LinkedInService::refreshAccessToken($refreshToken);
+        $connection->update([
+            'access_token' => $newTokens['access_token'],
+            'refresh_token' => $newTokens['refresh_token'] ?? $refreshToken,
+            'expires_at' => now()->addSeconds($newTokens['expires_in'] ?? 3600),
+        ]);
+    } catch (\Exception $e) {
+        // Handle refresh failure - may need to re-authenticate
+    }
+}
+```
+
+---
+
+## 🔐 Security Improvements
+
+### PKCE Benefits
+
+- **Prevents Authorization Code Interception**: Even if authorization code is intercepted, attacker cannot exchange it without code verifier
+- **No Client Secret Required**: PKCE allows public clients (mobile apps, SPAs) to securely use OAuth
+- **Industry Standard**: Recommended by OAuth 2.1 specification
+
+### Best Practices
+
+1. **Always use PKCE** when available (LinkedIn, Twitter/X)
+2. **Store code verifiers securely** (session, encrypted cache, database)
+3. **Never embed code verifier in state parameter** (security risk)
+4. **Clear code verifiers after use** (OAuthController does this automatically)
+
+---
+
+## 📊 Platform Support Matrix
+
+| Platform | PKCE Support | Refresh Token | Token Extension | Status |
+|----------|-------------|---------------|----------------|--------|
+| LinkedIn | ✅ Optional | ✅ Yes | ❌ No | ✅ Complete |
+| Twitter/X | ✅ Optional (default) | ✅ Yes | ❌ No | ✅ Complete |
+| Facebook | ❌ No | ❌ No | ✅ Yes | ✅ Complete |
+| Instagram | ❌ No | ❌ No | ✅ Yes | ✅ Complete |
+
+---
+
+## 🐛 Bug Fixes
+
+- Fixed Twitter/X callback to properly retrieve code verifier from session
+- Fixed LinkedIn callback to support PKCE code verifier
+- Fixed refresh token storage in OAuthController
+
+---
+
+## 📝 Full Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md) for complete list of changes.
+
+---
+
 ## 🎉 Laravel Social Media Publisher v2.0.2 - API Cleanup & Method Naming Improvements
 
 **Release Date**: November 14, 2025  
