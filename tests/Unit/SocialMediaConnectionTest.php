@@ -2,7 +2,7 @@
 
 namespace Mantix\LaravelSocialMediaPublisher\Tests\Unit;
 
-use mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
+use Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 use Illuminate\Support\Facades\Crypt;
 
 class SocialMediaConnectionTest extends TestCase

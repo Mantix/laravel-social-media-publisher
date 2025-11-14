@@ -116,9 +116,9 @@ You need to create authorization routes that redirect users to the OAuth provide
 
 ```php
 use Illuminate\Support\Facades\Route;
-use mantix\LaravelSocialMediaPublisher\Services\FacebookService;
-use mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
-use mantix\LaravelSocialMediaPublisher\Services\TwitterService;
+use Mantix\LaravelSocialMediaPublisher\Services\FacebookService;
+use Mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
+use Mantix\LaravelSocialMediaPublisher\Services\TwitterService;
 
 // Facebook OAuth (no PKCE support)
 Route::get('/auth/facebook', function () {
@@ -271,7 +271,7 @@ return [
 **Note**: All posting requires OAuth 2.0 connections. Users must authenticate their social media accounts through OAuth before posting. This is the only supported authentication method (except Telegram which uses Bot API).
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
+use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 
 // Post to multiple platforms (requires OAuth connections)
 $user = User::find(1);
@@ -294,7 +294,7 @@ $result = SocialMedia::shareVideo($user, ['youtube', 'tiktok'], 'Watch this!', '
 The package supports polymorphic relationships, allowing any model (User, Company, etc.) to have social media connections:
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 // Post on behalf of a User
 $user = User::find(1);
@@ -382,7 +382,7 @@ $usersWithFacebook = User::whereHas('social_media_connections', function ($query
 **Note**: All platform services require OAuth connections. Use `SocialMedia::platform()` with an owner to get a service instance.
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 // Get platform service for a user with OAuth connection
 $user = User::find(1);
@@ -414,8 +414,8 @@ $linkedinService->shareToCompanyPage('Company update!', 'https://example.com');
 ##### Basic OAuth (Without PKCE)
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Services\FacebookService;
-use mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
+use Mantix\LaravelSocialMediaPublisher\Services\FacebookService;
+use Mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
 
 // Facebook OAuth (no PKCE support)
 $redirectUri = route('social-media.facebook.callback');
@@ -431,8 +431,8 @@ return redirect($authUrl);
 ##### OAuth with PKCE (Recommended for LinkedIn and Twitter/X)
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
-use mantix\LaravelSocialMediaPublisher\Services\TwitterService;
+use Mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
+use Mantix\LaravelSocialMediaPublisher\Services\TwitterService;
 
 // LinkedIn OAuth with PKCE
 $redirectUri = route('social-media.linkedin.callback');
@@ -478,9 +478,9 @@ The default `OAuthController` handles:
 ##### For Platforms with Refresh Tokens (LinkedIn, Twitter/X)
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
-use mantix\LaravelSocialMediaPublisher\Services\TwitterService;
-use mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
+use Mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
+use Mantix\LaravelSocialMediaPublisher\Services\TwitterService;
+use Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 
 // Refresh LinkedIn token
 $connection = SocialMediaConnection::where('platform', 'linkedin')
@@ -524,8 +524,8 @@ if ($connection && $connection->refresh_token) {
 ##### For Platforms with Token Extension (Facebook, Instagram)
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Services\FacebookService;
-use mantix\LaravelSocialMediaPublisher\Services\InstagramService;
+use Mantix\LaravelSocialMediaPublisher\Services\FacebookService;
+use Mantix\LaravelSocialMediaPublisher\Services\InstagramService;
 
 // Extend Facebook token (short-lived to long-lived)
 $connection = SocialMediaConnection::where('platform', 'facebook')
@@ -571,9 +571,9 @@ if ($connection) {
 #### 4. Disconnect from Platform
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Services\FacebookService;
-use mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
-use mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
+use Mantix\LaravelSocialMediaPublisher\Services\FacebookService;
+use Mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
+use Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 
 // Disconnect for a user
 $user = User::find($userId);
@@ -605,7 +605,7 @@ The `SocialMedia` facade provides a unified interface for publishing to multiple
 **Note**: All methods require an owner with OAuth connections. The owner is always the first parameter.
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 // Post to specific platforms (requires owner with OAuth connections)
 $user = User::find(1);
@@ -667,7 +667,7 @@ Each platform service provides specific methods:
 #### Facebook
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 // Get service for a user (requires OAuth connection)
 $user = User::find(1);
@@ -687,7 +687,7 @@ $pageInfo = $facebook->getPageInfo();
 #### Twitter/X
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 // Get service for a user (requires OAuth connection)
 $user = User::find(1);
@@ -707,7 +707,7 @@ $userInfo = $twitter->getUserInfo();
 #### LinkedIn
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 // Get service for a user (requires OAuth connection)
 $user = User::find(1);
@@ -729,7 +729,7 @@ $userInfo = $linkedin->getUserInfo();
 #### Instagram
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 // Get service for a user (requires OAuth connection)
 $user = User::find(1);
@@ -753,7 +753,7 @@ $recentMedia = $instagram->getRecentMedia(25);
 #### TikTok
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 // Get service for a user (requires OAuth connection)
 $user = User::find(1);
@@ -770,7 +770,7 @@ $userVideos = $tiktok->getUserVideos(20);
 #### YouTube
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 // Get service for a user (requires OAuth connection)
 $user = User::find(1);
@@ -791,7 +791,7 @@ $videoAnalytics = $youtube->getVideoAnalytics('video_id');
 #### Pinterest
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 // Get service for a user (requires OAuth connection)
 $user = User::find(1);
@@ -815,7 +815,7 @@ $pinAnalytics = $pinterest->getPinAnalytics('pin_id');
 #### Telegram
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 // Get service for a user (requires OAuth connection)
 $user = User::find(1);
@@ -837,7 +837,7 @@ $updates = $telegram->getUpdates();
 #### Facebook Analytics
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 $user = User::find(1);
 $facebook = SocialMedia::platform('facebook', $user);
@@ -859,7 +859,7 @@ $insights = $facebook->getPageInsights(
 #### Instagram Carousels
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 $user = User::find(1);
 $instagram = SocialMedia::platform('instagram', $user);
@@ -876,7 +876,7 @@ $result = $instagram->shareCarousel('Check out our products!', $images);
 #### LinkedIn Company Pages
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 $user = User::find(1);
 $linkedin = SocialMedia::platform('linkedin', $user);
@@ -888,7 +888,7 @@ $linkedin->shareToCompanyPage('Company update: We\'re hiring!', 'https://example
 #### YouTube Community Posts
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 $user = User::find(1);
 $youtube = SocialMedia::platform('youtube', $user);
@@ -900,7 +900,7 @@ $youtube->createCommunityPost('What would you like to see in our next video?', '
 #### Pinterest Boards
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 $user = User::find(1);
 $pinterest = SocialMedia::platform('pinterest', $user);
@@ -919,8 +919,8 @@ $pins = $pinterest->getBoardPins('board_id', 25);
 The package provides comprehensive error handling:
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
-use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 
 try {
     $user = User::find(1);

@@ -3,15 +3,15 @@
 namespace Mantix\LaravelSocialMediaPublisher;
 
 use Illuminate\Support\ServiceProvider;
-use mantix\LaravelSocialMediaPublisher\Services\FacebookService;
-use mantix\LaravelSocialMediaPublisher\Services\InstagramService;
-use mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
-use mantix\LaravelSocialMediaPublisher\Services\PinterestService;
-use mantix\LaravelSocialMediaPublisher\Services\SocialMediaManager;
-use mantix\LaravelSocialMediaPublisher\Services\TelegramService;
-use mantix\LaravelSocialMediaPublisher\Services\TikTokService;
-use mantix\LaravelSocialMediaPublisher\Services\TwitterService;
-use mantix\LaravelSocialMediaPublisher\Services\YouTubeService;
+use Mantix\LaravelSocialMediaPublisher\Services\FacebookService;
+use Mantix\LaravelSocialMediaPublisher\Services\InstagramService;
+use Mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
+use Mantix\LaravelSocialMediaPublisher\Services\PinterestService;
+use Mantix\LaravelSocialMediaPublisher\Services\SocialMediaManager;
+use Mantix\LaravelSocialMediaPublisher\Services\TelegramService;
+use Mantix\LaravelSocialMediaPublisher\Services\TikTokService;
+use Mantix\LaravelSocialMediaPublisher\Services\TwitterService;
+use Mantix\LaravelSocialMediaPublisher\Services\YouTubeService;
 
 class SocialShareServiceProvider extends ServiceProvider {
 

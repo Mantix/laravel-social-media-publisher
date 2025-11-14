@@ -2,11 +2,11 @@
 
 namespace Mantix\LaravelSocialMediaPublisher\Services;
 
-use mantix\LaravelSocialMediaPublisher\Contracts\ShareDocumentPostInterface;
-use mantix\LaravelSocialMediaPublisher\Contracts\ShareImagePostInterface;
-use mantix\LaravelSocialMediaPublisher\Contracts\ShareInterface;
-use mantix\LaravelSocialMediaPublisher\Contracts\ShareVideoPostInterface;
-use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
+use Mantix\LaravelSocialMediaPublisher\Contracts\ShareDocumentPostInterface;
+use Mantix\LaravelSocialMediaPublisher\Contracts\ShareImagePostInterface;
+use Mantix\LaravelSocialMediaPublisher\Contracts\ShareInterface;
+use Mantix\LaravelSocialMediaPublisher\Contracts\ShareVideoPostInterface;
+use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 use Illuminate\Support\Facades\Log;
 
 /**

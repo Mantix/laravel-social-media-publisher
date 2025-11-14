@@ -2,8 +2,8 @@
 
 namespace Mantix\LaravelSocialMediaPublisher\Tests\Unit;
 
-use mantix\LaravelSocialMediaPublisher\Services\FacebookService;
-use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
+use Mantix\LaravelSocialMediaPublisher\Services\FacebookService;
+use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 

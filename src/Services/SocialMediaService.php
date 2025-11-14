@@ -4,7 +4,7 @@ namespace Mantix\LaravelSocialMediaPublisher\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
+use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 
 abstract class SocialMediaService
 {

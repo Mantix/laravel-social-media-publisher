@@ -4,10 +4,10 @@ namespace Mantix\LaravelSocialMediaPublisher\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use mantix\LaravelSocialMediaPublisher\Contracts\ShareImagePostInterface;
-use mantix\LaravelSocialMediaPublisher\Contracts\ShareInterface;
-use mantix\LaravelSocialMediaPublisher\Contracts\ShareVideoPostInterface;
-use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
+use Mantix\LaravelSocialMediaPublisher\Contracts\ShareImagePostInterface;
+use Mantix\LaravelSocialMediaPublisher\Contracts\ShareInterface;
+use Mantix\LaravelSocialMediaPublisher\Contracts\ShareVideoPostInterface;
+use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 
 /**
  * Class InstagramService

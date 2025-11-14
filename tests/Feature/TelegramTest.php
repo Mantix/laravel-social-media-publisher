@@ -2,7 +2,7 @@
 
 namespace Mantix\LaravelSocialMediaPublisher\Tests\Feature;
 
-use mantix\LaravelSocialMediaPublisher\Facades\Telegram;
+use Mantix\LaravelSocialMediaPublisher\Facades\Telegram;
 use Illuminate\Support\Facades\Http;
 
 class TelegramTest extends TestCase {

@@ -3,7 +3,7 @@
 namespace Mantix\LaravelSocialMediaPublisher\Tests\Unit;
 
 use Orchestra\Testbench\TestCase as OrchestraTestCase;
-use mantix\LaravelSocialMediaPublisher\Tests\Helpers\TestHelpers;
+use Mantix\LaravelSocialMediaPublisher\Tests\Helpers\TestHelpers;
 use Illuminate\Support\Facades\Schema;
 
 abstract class TestCase extends OrchestraTestCase

@@ -2,7 +2,7 @@
 
 namespace Mantix\LaravelSocialMediaPublisher\Tests\Feature;
 
-use mantix\LaravelSocialMediaPublisher\SocialShareServiceProvider;
+use Mantix\LaravelSocialMediaPublisher\SocialShareServiceProvider;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 
 abstract class TestCase extends BaseTestCase {

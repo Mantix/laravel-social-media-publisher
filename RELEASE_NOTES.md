@@ -25,7 +25,7 @@ Instead of manually defining relationships and methods in each model, you can no
 
 ```php
 use Illuminate\Database\Eloquent\Model;
-use Mantix\LaravelSocialMediaPublisher\Traits\HasSocialMediaConnections;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 class User extends Model
 {
@@ -871,7 +871,7 @@ php artisan vendor:publish --provider="mantix\LaravelSocialMediaPublisher\Social
 **Note**: All posting requires OAuth connections. Users must authenticate their accounts first.
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 // Post to specific platforms (requires owner with OAuth connections)
 $user = User::find(1);

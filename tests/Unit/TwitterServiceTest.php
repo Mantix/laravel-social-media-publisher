@@ -2,9 +2,9 @@
 
 namespace Mantix\LaravelSocialMediaPublisher\Tests\Unit;
 
-use mantix\LaravelSocialMediaPublisher\Tests\Unit\TestCase;
-use mantix\LaravelSocialMediaPublisher\Services\TwitterService;
-use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
+use Mantix\LaravelSocialMediaPublisher\Tests\Unit\TestCase;
+use Mantix\LaravelSocialMediaPublisher\Services\TwitterService;
+use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 

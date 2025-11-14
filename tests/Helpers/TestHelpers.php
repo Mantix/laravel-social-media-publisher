@@ -3,7 +3,7 @@
 namespace Mantix\LaravelSocialMediaPublisher\Tests\Helpers;
 
 use Illuminate\Support\Facades\Crypt;
-use mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
+use Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 
 trait TestHelpers
 {

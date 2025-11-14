@@ -8,10 +8,10 @@
 
 require_once __DIR__ . '/../../vendor/autoload.php';
 
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
-use mantix\LaravelSocialMediaPublisher\Facades\FaceBook;
-use mantix\LaravelSocialMediaPublisher\Facades\Twitter;
-use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use Mantix\LaravelSocialMediaPublisher\Facades\FaceBook;
+use Mantix\LaravelSocialMediaPublisher\Facades\Twitter;
+use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 
 echo "🛡️  Laravel Social Media Publisher - Error Handling Examples\n";
 echo "=====================================================\n\n";

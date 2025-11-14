@@ -9,8 +9,8 @@
 
 require_once __DIR__ . '/../../vendor/autoload.php';
 
-use mantix\LaravelSocialMediaPublisher\Facades\FaceBook;
-use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
+use Mantix\LaravelSocialMediaPublisher\Facades\FaceBook;
+use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 
 echo "📘 Facebook-Specific Examples\n";
 echo "============================\n\n";

@@ -3,7 +3,7 @@
 namespace Mantix\LaravelSocialMediaPublisher\Tests\Feature;
 
 
-use mantix\LaravelSocialMediaPublisher\Facades\FaceBook;
+use Mantix\LaravelSocialMediaPublisher\Facades\FaceBook;
 use Illuminate\Support\Facades\Http;
 
 class FaceBookTest extends TestCase {

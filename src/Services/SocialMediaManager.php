@@ -3,8 +3,8 @@
 namespace Mantix\LaravelSocialMediaPublisher\Services;
 
 use Illuminate\Support\Facades\Log;
-use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
-use mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
+use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
+use Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 
 /**
  * Class SocialMediaManager

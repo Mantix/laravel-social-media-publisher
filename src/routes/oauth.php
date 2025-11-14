@@ -2,7 +2,7 @@
 
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Support\Facades\Route;
-use mantix\LaravelSocialMediaPublisher\Http\Controllers\OAuthController;
+use Mantix\LaravelSocialMediaPublisher\Http\Controllers\OAuthController;
 
 /*
 |--------------------------------------------------------------------------

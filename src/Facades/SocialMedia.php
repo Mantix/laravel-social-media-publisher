@@ -3,7 +3,7 @@
 namespace Mantix\LaravelSocialMediaPublisher\Facades;
 
 use Illuminate\Support\Facades\Facade;
-use mantix\LaravelSocialMediaPublisher\Services\SocialMediaManager;
+use Mantix\LaravelSocialMediaPublisher\Services\SocialMediaManager;
 
 /**
  * Class SocialMedia

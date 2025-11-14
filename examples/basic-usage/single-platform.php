@@ -9,15 +9,15 @@
 
 require_once __DIR__ . '/../../vendor/autoload.php';
 
-use mantix\LaravelSocialMediaPublisher\Facades\FaceBook;
-use mantix\LaravelSocialMediaPublisher\Facades\Twitter;
-use mantix\LaravelSocialMediaPublisher\Facades\LinkedIn;
-use mantix\LaravelSocialMediaPublisher\Facades\Instagram;
-use mantix\LaravelSocialMediaPublisher\Facades\TikTok;
-use mantix\LaravelSocialMediaPublisher\Facades\YouTube;
-use mantix\LaravelSocialMediaPublisher\Facades\Pinterest;
-use mantix\LaravelSocialMediaPublisher\Facades\Telegram;
-use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
+use Mantix\LaravelSocialMediaPublisher\Facades\FaceBook;
+use Mantix\LaravelSocialMediaPublisher\Facades\Twitter;
+use Mantix\LaravelSocialMediaPublisher\Facades\LinkedIn;
+use Mantix\LaravelSocialMediaPublisher\Facades\Instagram;
+use Mantix\LaravelSocialMediaPublisher\Facades\TikTok;
+use Mantix\LaravelSocialMediaPublisher\Facades\YouTube;
+use Mantix\LaravelSocialMediaPublisher\Facades\Pinterest;
+use Mantix\LaravelSocialMediaPublisher\Facades\Telegram;
+use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 
 echo "🚀 Laravel Social Media Publisher - Single Platform Examples\n";
 echo "====================================================\n\n";

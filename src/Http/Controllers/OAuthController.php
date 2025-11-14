@@ -4,12 +4,12 @@ namespace Mantix\LaravelSocialMediaPublisher\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
-use mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
-use mantix\LaravelSocialMediaPublisher\Services\FacebookService;
-use mantix\LaravelSocialMediaPublisher\Services\InstagramService;
-use mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
-use mantix\LaravelSocialMediaPublisher\Services\TwitterService;
+use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
+use Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
+use Mantix\LaravelSocialMediaPublisher\Services\FacebookService;
+use Mantix\LaravelSocialMediaPublisher\Services\InstagramService;
+use Mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
+use Mantix\LaravelSocialMediaPublisher\Services\TwitterService;
 
 /**
  * OAuth Controller

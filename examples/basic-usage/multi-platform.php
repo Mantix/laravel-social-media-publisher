@@ -9,8 +9,8 @@
 
 require_once __DIR__ . '/../../vendor/autoload.php';
 
-use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 echo "🚀 Laravel Social Media Publisher - Multi-Platform Examples\n";
 echo "====================================================\n\n";
