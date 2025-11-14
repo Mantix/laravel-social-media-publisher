@@ -1,5 +1,28 @@
 # Release Notes
 
+## 🎉 Laravel Social Media Publisher v2.0.5 - Fixed some typo's
+
+**Release Date**: November 14, 2025  
+**Version**: 2.0.5
+**Type**: Minor Release
+
+---
+
+## ✨ What's New
+
+Keeping our code clean.
+
+---
+
+## 📚 Documentation
+
+### Updated Documentation
+
+- **README.md**: Added comprehensive trait usage guide with examples
+- **CHANGELOG.md**: Complete list of all changes
+
+---
+
 ## 🎉 Laravel Social Media Publisher v2.0.4 - Model Trait for Easy Integration
 
 **Release Date**: November 14, 2025  
