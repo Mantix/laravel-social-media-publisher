@@ -1,6 +1,6 @@
 <?php
 
-namespace mantix\LaravelSocialMediaPublisher\Tests\Helpers;
+namespace Mantix\LaravelSocialMediaPublisher\Tests\Helpers;
 
 use Illuminate\Support\Facades\Crypt;
 use mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;

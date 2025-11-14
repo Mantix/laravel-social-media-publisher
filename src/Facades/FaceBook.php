@@ -1,6 +1,6 @@
 <?php
 
-namespace mantix\LaravelSocialMediaPublisher\Facades;
+namespace Mantix\LaravelSocialMediaPublisher\Facades;
 
 use Illuminate\Support\Facades\Facade;
 

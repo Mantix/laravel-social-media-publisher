@@ -1,6 +1,6 @@
 <?php
 
-namespace mantix\LaravelSocialMediaPublisher\Tests\Unit;
+namespace Mantix\LaravelSocialMediaPublisher\Tests\Unit;
 
 use mantix\LaravelSocialMediaPublisher\Tests\Unit\TestCase;
 use mantix\LaravelSocialMediaPublisher\Services\YouTubeService;

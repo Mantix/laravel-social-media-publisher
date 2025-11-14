@@ -1,6 +1,6 @@
 <?php
 
-namespace mantix\LaravelSocialMediaPublisher\Http\Controllers;
+namespace Mantix\LaravelSocialMediaPublisher\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;

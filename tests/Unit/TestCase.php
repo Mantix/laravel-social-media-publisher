@@ -1,6 +1,6 @@
 <?php
 
-namespace mantix\LaravelSocialMediaPublisher\Tests\Unit;
+namespace Mantix\LaravelSocialMediaPublisher\Tests\Unit;
 
 use Orchestra\Testbench\TestCase as OrchestraTestCase;
 use mantix\LaravelSocialMediaPublisher\Tests\Helpers\TestHelpers;

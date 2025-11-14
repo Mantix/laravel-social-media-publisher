@@ -14,10 +14,10 @@ return new class extends Migration
         Schema::create('social_media_connections', function (Blueprint $table) {
             $table->id();
             $table->morphs('owner'); // Creates owner_id and owner_type columns for polymorphic relationship
-            $table->string('platform'); // facebook, twitter, linkedin, etc.
-            $table->string('connection_type')->default('profile'); // profile, page, company, etc.
-            $table->string('platform_user_id')->nullable(); // User ID on the platform
-            $table->string('platform_username')->nullable(); // Username on the platform
+            $table->string('platform', 20); // facebook, twitter, linkedin, etc.
+            $table->string('connection_type', 20)->default('profile'); // profile, page, company, etc.
+            $table->string('platform_user_id', 192)->nullable(); // User ID on the platform
+            $table->string('platform_username', 192)->nullable(); // Username on the platform
             $table->text('access_token')->nullable(); // Encrypted access token
             $table->text('refresh_token')->nullable(); // Encrypted refresh token
             $table->text('token_secret')->nullable(); // For OAuth 1.0 (Twitter)
@@ -27,8 +27,8 @@ return new class extends Migration
             $table->timestamps();
             
             // Indexes
-            $table->index(['owner_id', 'owner_type', 'platform']);
-            $table->index(['owner_id', 'owner_type', 'platform', 'connection_type']);
+            $table->index(['owner_id', 'owner_type', 'platform'], 'owner_platform_index');
+            $table->index(['owner_id', 'owner_type', 'platform', 'connection_type'], 'owner_platform_connection_index');
             $table->unique(['owner_id', 'owner_type', 'platform', 'connection_type', 'platform_user_id'], 'unique_connection');
         });
     }

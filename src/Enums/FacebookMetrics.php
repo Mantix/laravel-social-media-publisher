@@ -1,6 +1,6 @@
 <?php
 
-namespace mantix\LaravelSocialMediaPublisher\Enums;
+namespace Mantix\LaravelSocialMediaPublisher\Enums;
 
 enum FacebookMetrics: string {
 

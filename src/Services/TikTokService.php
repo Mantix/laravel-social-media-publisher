@@ -1,6 +1,6 @@
 <?php
 
-namespace mantix\LaravelSocialMediaPublisher\Services;
+namespace Mantix\LaravelSocialMediaPublisher\Services;
 
 use mantix\LaravelSocialMediaPublisher\Contracts\ShareImagePostInterface;
 use mantix\LaravelSocialMediaPublisher\Contracts\ShareInterface;

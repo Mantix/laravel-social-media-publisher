@@ -1,6 +1,6 @@
 <?php
 
-namespace mantix\LaravelSocialMediaPublisher\Contracts;
+namespace Mantix\LaravelSocialMediaPublisher\Contracts;
 
 interface ShareVideoPostInterface {
 

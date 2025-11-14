@@ -1,6 +1,6 @@
 <?php
 
-namespace mantix\LaravelSocialMediaPublisher\Services;
+namespace Mantix\LaravelSocialMediaPublisher\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -387,13 +387,16 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
         $this->validateInput($caption, $image_url);
         
         try {
+            // Use organization_urn if available, otherwise fall back to person_urn
+            $author = $this->organization_urn ?? $this->person_urn;
+            
             // Step 1: Upload image
             $imageUrn = $this->uploadImage($image_url);
             
             // Step 2: Create post with image
             $url = $this->buildApiUrl('ugcPosts');
             $params = [
-                'author' => $this->person_urn,
+                'author' => $author,
                 'lifecycleState' => 'PUBLISHED',
                 'specificContent' => [
                     'com.linkedin.ugc.ShareContent' => [
@@ -424,6 +427,8 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
             $this->log('info', 'LinkedIn image post shared successfully', [
                 'platform' => 'linkedin',
                 'post_id' => $response['id'] ?? null,
+                'author' => $author,
+                'organization_urn' => $this->organization_urn,
                 'person_urn' => $this->person_urn,
                 'caption_length' => strlen($caption),
             ]);
@@ -452,13 +457,16 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
         $this->validateInput($caption, $video_url);
         
         try {
+            // Use organization_urn if available, otherwise fall back to person_urn
+            $author = $this->organization_urn ?? $this->person_urn;
+            
             // Step 1: Upload video
             $videoUrn = $this->uploadVideo($video_url);
             
             // Step 2: Create post with video
             $url = $this->buildApiUrl('ugcPosts');
             $params = [
-                'author' => $this->person_urn,
+                'author' => $author,
                 'lifecycleState' => 'PUBLISHED',
                 'specificContent' => [
                     'com.linkedin.ugc.ShareContent' => [
@@ -489,6 +497,8 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
             $this->log('info', 'LinkedIn video post shared successfully', [
                 'platform' => 'linkedin',
                 'post_id' => $response['id'] ?? null,
+                'author' => $author,
+                'organization_urn' => $this->organization_urn,
                 'person_urn' => $this->person_urn,
                 'caption_length' => strlen($caption),
             ]);
@@ -604,12 +614,15 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
      */
     private function uploadImage(string $imageUrl): string
     {
+        // Use organization_urn if available, otherwise fall back to person_urn
+        $owner = $this->organization_urn ?? $this->person_urn;
+        
         // Step 1: Register upload
         $registerUrl = $this->buildApiUrl('assets?action=registerUpload');
         $registerParams = [
             'registerUploadRequest' => [
                 'recipes' => ['urn:li:digitalmediaRecipe:feedshare-image'],
-                'owner' => $this->person_urn,
+                'owner' => $owner,
                 'serviceRelationships' => [
                     [
                         'relationshipType' => 'OWNER',
@@ -649,12 +662,15 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
      */
     private function uploadVideo(string $videoUrl): string
     {
+        // Use organization_urn if available, otherwise fall back to person_urn
+        $owner = $this->organization_urn ?? $this->person_urn;
+        
         // Step 1: Register upload
         $registerUrl = $this->buildApiUrl('assets?action=registerUpload');
         $registerParams = [
             'registerUploadRequest' => [
                 'recipes' => ['urn:li:digitalmediaRecipe:feedshare-video'],
-                'owner' => $this->person_urn,
+                'owner' => $owner,
                 'serviceRelationships' => [
                     [
                         'relationshipType' => 'OWNER',

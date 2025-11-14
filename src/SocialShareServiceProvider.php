@@ -1,6 +1,6 @@
 <?php
 
-namespace mantix\LaravelSocialMediaPublisher;
+namespace Mantix\LaravelSocialMediaPublisher;
 
 use Illuminate\Support\ServiceProvider;
 use mantix\LaravelSocialMediaPublisher\Services\FacebookService;

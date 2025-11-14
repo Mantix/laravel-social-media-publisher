@@ -1,6 +1,6 @@
 <?php
 
-namespace mantix\LaravelSocialMediaPublisher\Exceptions;
+namespace Mantix\LaravelSocialMediaPublisher\Exceptions;
 
 use Exception;
 
