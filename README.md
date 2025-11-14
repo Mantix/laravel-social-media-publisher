@@ -314,6 +314,69 @@ $result = SocialMedia::shareUrl(Company::class, ['facebook'], 'Update', 'https:/
 
 **Note**: All posting requires OAuth 2.0 connections. Users must authenticate their social media accounts through OAuth before posting. OAuth is the only supported authentication method (except Telegram which uses Bot API).
 
+#### Using the HasSocialMediaConnections Trait
+
+For easier integration, you can use the `HasSocialMediaConnections` trait on your custom models. This trait provides convenient methods for accessing social media connections:
+
+```php
+use Illuminate\Database\Eloquent\Model;
+use Mantix\LaravelSocialMediaPublisher\Traits\HasSocialMediaConnections;
+
+class User extends Model
+{
+    use HasSocialMediaConnections;
+    
+    // ... rest of your model
+}
+
+class Company extends Model
+{
+    use HasSocialMediaConnections;
+    
+    // ... rest of your model
+}
+```
+
+Once the trait is added, you can use the following methods:
+
+```php
+$user = User::find(1);
+
+// Get all social media connections
+$connections = $user->social_media_connections;
+
+// Get platform-specific connections
+$linkedinConnection = $user->social_connection_linkedin;
+$facebookConnection = $user->social_connection_facebook;
+$instagramConnection = $user->social_connection_instagram;
+$xConnection = $user->social_connection_x;
+
+// Get active connection for a specific platform
+$facebookConnection = $user->getSocialConnection('facebook');
+
+// Check if user has active connection for a platform
+if ($user->hasSocialConnection('linkedin')) {
+    // User has an active LinkedIn connection
+    $linkedinService = SocialMedia::platform('linkedin', $user);
+    $linkedinService->shareUrl('Hello LinkedIn!', 'https://example.com');
+}
+
+// Use in queries
+$usersWithFacebook = User::whereHas('social_media_connections', function ($query) {
+    $query->where('platform', 'facebook')->where('is_active', true);
+})->get();
+```
+
+**Available Trait Methods:**
+
+- `social_media_connections(): MorphMany` - Get all social media connections
+- `social_connection_linkedin(): HasOne` - Get latest LinkedIn connection
+- `social_connection_instagram(): HasOne` - Get latest Instagram connection
+- `social_connection_facebook(): HasOne` - Get latest Facebook connection
+- `social_connection_x(): HasOne` - Get latest X (Twitter) connection
+- `getSocialConnection(string $platform): ?SocialMediaConnection` - Get active connection for platform
+- `hasSocialConnection(string $platform): bool` - Check if model has active connection
+
 ### Individual Platform Access
 
 **Note**: All platform services require OAuth connections. Use `SocialMedia::platform()` with an owner to get a service instance.

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.4] - 2025-11-14
+
+### ✨ Added
+
+#### Model Trait for Easy Integration
+- **HasSocialMediaConnections Trait**: New trait to easily add social media connection functionality to custom models
+  - `social_media_connections()` - MorphMany relationship for all connections
+  - `social_connection_linkedin()` - HasOne relationship for latest LinkedIn connection
+  - `social_connection_instagram()` - HasOne relationship for latest Instagram connection
+  - `social_connection_facebook()` - HasOne relationship for latest Facebook connection
+  - `social_connection_x()` - HasOne relationship for latest X (Twitter) connection
+  - `getSocialConnection(string $platform)` - Get active connection for a specific platform
+  - `hasSocialConnection(string $platform)` - Check if model has active connection for platform
+  - Simply use `use HasSocialMediaConnections;` in your model to enable all functionality
+
 ## [2.0.3] - 2025-11-14
 
 ### ✨ Added

@@ -1,5 +1,139 @@
 # Release Notes
 
+## 🎉 Laravel Social Media Publisher v2.0.4 - Model Trait for Easy Integration
+
+**Release Date**: November 14, 2025  
+**Version**: 2.0.4  
+**Type**: Minor Release
+
+---
+
+## ✨ What's New
+
+### HasSocialMediaConnections Trait
+
+A new trait that makes it incredibly easy to add social media connection functionality to any custom model:
+
+- ✅ **Simple Integration**: Just add `use HasSocialMediaConnections;` to your model
+- ✅ **Relationship Methods**: Automatic polymorphic relationships for all connections
+- ✅ **Platform-Specific Methods**: Convenient methods for LinkedIn, Instagram, Facebook, and X
+- ✅ **Helper Methods**: Easy-to-use methods for checking and retrieving connections
+
+### Why Use the Trait?
+
+Instead of manually defining relationships and methods in each model, you can now simply use the trait:
+
+```php
+use Illuminate\Database\Eloquent\Model;
+use Mantix\LaravelSocialMediaPublisher\Traits\HasSocialMediaConnections;
+
+class User extends Model
+{
+    use HasSocialMediaConnections;
+    
+    // That's it! All methods are now available
+}
+```
+
+### Available Methods
+
+#### Relationship Methods
+
+- **`social_media_connections()`**: Get all social media connections (MorphMany)
+- **`social_connection_linkedin()`**: Get latest LinkedIn connection (HasOne)
+- **`social_connection_instagram()`**: Get latest Instagram connection (HasOne)
+- **`social_connection_facebook()`**: Get latest Facebook connection (HasOne)
+- **`social_connection_x()`**: Get latest X (Twitter) connection (HasOne)
+
+#### Helper Methods
+
+- **`getSocialConnection(string $platform)`**: Get active connection for a specific platform
+- **`hasSocialConnection(string $platform)`**: Check if model has active connection for platform
+
+### Usage Examples
+
+```php
+$user = User::find(1);
+
+// Get all connections
+$connections = $user->social_media_connections;
+
+// Get platform-specific connections
+$linkedinConnection = $user->social_connection_linkedin;
+$facebookConnection = $user->social_connection_facebook;
+
+// Check if user has active connection
+if ($user->hasSocialConnection('linkedin')) {
+    $linkedinService = SocialMedia::platform('linkedin', $user);
+    $linkedinService->shareUrl('Hello LinkedIn!', 'https://example.com');
+}
+
+// Get active connection for a platform
+$facebookConnection = $user->getSocialConnection('facebook');
+
+// Use in queries
+$usersWithFacebook = User::whereHas('social_media_connections', function ($query) {
+    $query->where('platform', 'facebook')->where('is_active', true);
+})->get();
+```
+
+### Benefits
+
+1. **DRY Principle**: No need to duplicate relationship definitions across models
+2. **Consistency**: All models using the trait have the same interface
+3. **Maintainability**: Updates to connection logic only need to be made in one place
+4. **Type Safety**: Full type hints and return types for better IDE support
+5. **Query Optimization**: Relationships are optimized for efficient database queries
+
+---
+
+## 🎯 Migration Guide
+
+### For Existing Users
+
+**No migration required!** This is a non-breaking release. The trait is completely optional.
+
+### Adding the Trait to Your Models
+
+If you want to use the trait in your existing models:
+
+1. **Add the trait to your model**:
+   ```php
+   use Mantix\LaravelSocialMediaPublisher\Traits\HasSocialMediaConnections;
+   
+   class User extends Model
+   {
+       use HasSocialMediaConnections;
+   }
+   ```
+
+2. **Remove any duplicate relationship definitions** (if you have them):
+   ```php
+   // Remove these if you have them - the trait provides them
+   // public function social_media_connections() { ... }
+   // public function social_connection_linkedin() { ... }
+   ```
+
+3. **Update your code to use the trait methods** (optional):
+   ```php
+   // Before (if you had custom methods)
+   $connection = $user->getFacebookConnection();
+   
+   // After (using trait method)
+   $connection = $user->getSocialConnection('facebook');
+   ```
+
+---
+
+## 📚 Documentation
+
+### Updated Documentation
+
+- **README.md**: Added comprehensive trait usage guide with examples
+- **CHANGELOG.md**: Complete list of all changes
+
+---
+
 ## 🎉 Laravel Social Media Publisher v2.0.3 - OAuth Security & Token Management Enhancements
 
 **Release Date**: January 2025  
