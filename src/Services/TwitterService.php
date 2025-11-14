@@ -2,11 +2,13 @@
 
 namespace mantix\LaravelSocialMediaPublisher\Services;
 
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use mantix\LaravelSocialMediaPublisher\Contracts\ShareImagePostInterface;
 use mantix\LaravelSocialMediaPublisher\Contracts\ShareInterface;
 use mantix\LaravelSocialMediaPublisher\Contracts\ShareVideoPostInterface;
 use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
-use Illuminate\Support\Facades\Log;
+use mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 
 /**
  * Class TwitterService
@@ -70,24 +72,330 @@ class TwitterService extends SocialMediaService implements ShareInterface, Share
     }
 
     /**
-     * Get the singleton instance of TwitterService.
+     * Get instance - OAuth connection required.
+     * 
+     * @return TwitterService
+     * @throws SocialMediaException
+     * @deprecated Use forConnection() with a SocialMediaConnection instead
      */
     public static function getInstance(): TwitterService
     {
-        if (self::$instance === null) {
-            $bearerToken = config('autopost.twitter_bearer_token');
-            $apiKey = config('autopost.twitter_api_key');
-            $apiSecret = config('autopost.twitter_api_secret');
-            $accessToken = config('autopost.twitter_access_token');
-            $accessTokenSecret = config('autopost.twitter_access_token_secret');
+        throw new SocialMediaException('OAuth connection required. Please use forConnection() with a SocialMediaConnection or authenticate via OAuth first.');
+    }
 
-            if (!$bearerToken || !$apiKey || !$apiSecret || !$accessToken || !$accessTokenSecret) {
-                throw new SocialMediaException('Twitter credentials are not properly configured.');
+    /**
+     * Create a new instance with specific credentials.
+     *
+     * @param string $bearerToken
+     * @param string $apiKey
+     * @param string $apiSecret
+     * @param string $accessToken
+     * @param string $accessTokenSecret
+     * @return TwitterService
+     */
+    public static function withCredentials(string $bearerToken, string $apiKey, string $apiSecret, string $accessToken, string $accessTokenSecret): TwitterService
+    {
+        return new self($bearerToken, $apiKey, $apiSecret, $accessToken, $accessTokenSecret);
+    }
+
+    /**
+     * Create a new instance from a SocialMediaConnection.
+     *
+     * @param SocialMediaConnection $connection
+     * @return TwitterService
+     * @throws SocialMediaException
+     */
+    public static function forConnection(SocialMediaConnection $connection): TwitterService
+    {
+        if ($connection->platform !== 'twitter') {
+            throw new SocialMediaException('Connection is not for Twitter platform.');
+        }
+
+        $accessToken = $connection->getDecryptedAccessToken();
+        $tokenSecret = $connection->getDecryptedTokenSecret();
+        $metadata = $connection->metadata ?? [];
+        $bearerToken = $metadata['bearer_token'] ?? null;
+        $apiKey = $metadata['api_key'] ?? null;
+        $apiSecret = $metadata['api_secret'] ?? null;
+
+        if (!$accessToken || !$tokenSecret) {
+            throw new SocialMediaException('Twitter connection is missing required credentials.');
+        }
+
+        // If bearer token and API keys are not in metadata, try to get from config
+        if (!$bearerToken || !$apiKey || !$apiSecret) {
+            $apiKey = config('social_media_publisher.x_api_key');
+            $apiSecret = config('social_media_publisher.x_api_secret_key');
+        }
+
+        if (!$bearerToken || !$apiKey || !$apiSecret) {
+            throw new SocialMediaException('Twitter API credentials are missing.');
+        }
+
+        return new self($bearerToken, $apiKey, $apiSecret, $accessToken, $tokenSecret);
+    }
+
+    /**
+     * Get the authorization URL for Twitter/X OAuth 2.0.
+     *
+     * @param string $redirectUri
+     * @param string|null $state
+     * @param array $scopes
+     * @return string
+     * @throws SocialMediaException
+     */
+    public static function getAuthorizationUrl(string $redirectUri, ?string $state = null, array $scopes = ['tweet.read', 'tweet.write', 'users.read', 'offline.access']): string
+    {
+        $clientId = config('social_media_publisher.x_client_id');
+
+        if (!$clientId) {
+            throw new SocialMediaException('X/Twitter Client ID must be configured for OAuth.');
+        }
+
+        $state = $state ?? bin2hex(random_bytes(16));
+        $scopeString = implode(' ', $scopes);
+
+        // Generate PKCE code verifier and challenge
+        $codeVerifier = bin2hex(random_bytes(32));
+        $codeChallenge = base64_encode(hash('sha256', $codeVerifier, true));
+        $codeChallenge = rtrim(strtr($codeChallenge, '+/', '-_'), '='); // Base64 URL encoding
+
+        // Store code verifier in session or cache for later use in handleCallback
+        // For now, we'll include it in the state parameter (not ideal, but works)
+        // In production, use session or cache storage
+        $stateWithVerifier = base64_encode(json_encode([
+            'state' => $state,
+            'code_verifier' => $codeVerifier,
+        ]));
+
+        $authUrl = sprintf(
+            'https://twitter.com/i/oauth2/authorize?response_type=code&client_id=%s&redirect_uri=%s&scope=%s&state=%s&code_challenge=%s&code_challenge_method=S256',
+            urlencode($clientId),
+            urlencode($redirectUri),
+            urlencode($scopeString),
+            urlencode($stateWithVerifier),
+            urlencode($codeChallenge)
+        );
+
+        if (config('social_media_publisher.enable_logging', true)) {
+            Log::info('Twitter/X OAuth authorization URL generated', [
+                'platform' => 'twitter',
+                'redirect_uri' => $redirectUri,
+                'scopes' => $scopes,
+                'state' => $state,
+                'has_client_id' => !empty($clientId),
+            ]);
+        }
+
+        return $authUrl;
+    }
+
+    /**
+     * Handle the OAuth callback and exchange code for access token.
+     *
+     * @param string $code
+     * @param string $redirectUri
+     * @param string|null $codeVerifier PKCE code verifier (should be retrieved from session/cache)
+     * @return array
+     * @throws SocialMediaException
+     */
+    public static function handleCallback(string $code, string $redirectUri, ?string $codeVerifier = null): array
+    {
+        $enableLogging = config('social_media_publisher.enable_logging', true);
+        
+        if ($enableLogging) {
+            Log::info('Twitter/X OAuth callback initiated', [
+                'platform' => 'twitter',
+                'redirect_uri' => $redirectUri,
+                'has_code' => !empty($code),
+            ]);
+        }
+
+        $clientId = config('social_media_publisher.x_client_id');
+        $clientSecret = config('social_media_publisher.x_client_secret');
+
+        if (!$clientId || !$clientSecret) {
+            if ($enableLogging) {
+                Log::error('Twitter/X OAuth callback failed: missing credentials', [
+                    'platform' => 'twitter',
+                    'has_client_id' => !empty($clientId),
+                    'has_client_secret' => !empty($clientSecret),
+                ]);
+            }
+            throw new SocialMediaException('X/Twitter Client ID and Client Secret must be configured for OAuth.');
+        }
+
+        // Exchange code for access token
+        $tokenUrl = 'https://api.twitter.com/2/oauth2/token';
+        
+        if ($enableLogging) {
+            Log::debug('Exchanging Twitter/X OAuth code for access token', [
+                'platform' => 'twitter',
+                'token_url' => $tokenUrl,
+                'redirect_uri' => $redirectUri,
+            ]);
+        }
+        
+        $timeout = config('social_media_publisher.timeout', 30);
+        $params = [
+            'code' => $code,
+            'grant_type' => 'authorization_code',
+            'client_id' => $clientId,
+            'redirect_uri' => $redirectUri,
+        ];
+
+        // Add PKCE code verifier if provided
+        if ($codeVerifier) {
+            $params['code_verifier'] = $codeVerifier;
+        }
+
+        $response = Http::timeout($timeout)
+            ->withBasicAuth($clientId, $clientSecret)
+            ->asForm()
+            ->post($tokenUrl, $params);
+
+        if (!$response->successful()) {
+            if ($enableLogging) {
+                Log::error('Twitter/X OAuth token exchange failed', [
+                    'platform' => 'twitter',
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                ]);
+            }
+            throw new SocialMediaException('Failed to exchange code for access token: ' . $response->body());
+        }
+
+        $tokenData = $response->json();
+        $accessToken = $tokenData['access_token'] ?? null;
+        $refreshToken = $tokenData['refresh_token'] ?? null;
+        $expiresIn = $tokenData['expires_in'] ?? null;
+
+        if (!$accessToken) {
+            if ($enableLogging) {
+                Log::error('Twitter/X OAuth callback failed: missing access token', [
+                    'platform' => 'twitter',
+                    'response' => $tokenData,
+                ]);
+            }
+            throw new SocialMediaException('Failed to obtain access token from Twitter/X OAuth response.');
+        }
+
+        // Get user profile
+        $userProfile = self::getUserProfile($accessToken);
+
+        if ($enableLogging) {
+            Log::info('Twitter/X OAuth callback completed successfully', [
+                'platform' => 'twitter',
+                'user_id' => $userProfile['id'] ?? null,
+                'username' => $userProfile['username'] ?? null,
+                'has_refresh_token' => !empty($refreshToken),
+                'expires_in' => $expiresIn,
+            ]);
+        }
+
+        return [
+            'access_token' => $accessToken,
+            'refresh_token' => $refreshToken,
+            'expires_in' => $expiresIn,
+            'token_type' => $tokenData['token_type'] ?? 'bearer',
+            'scope' => $tokenData['scope'] ?? null,
+            'user_profile' => $userProfile,
+        ];
+    }
+
+    /**
+     * Get user profile using access token.
+     *
+     * @param string $accessToken
+     * @return array
+     * @throws SocialMediaException
+     */
+    private static function getUserProfile(string $accessToken): array
+    {
+        $timeout = config('social_media_publisher.timeout', 30);
+        $response = Http::timeout($timeout)
+            ->withToken($accessToken)
+            ->get('https://api.twitter.com/2/users/me', [
+                'user.fields' => 'id,name,username',
+            ]);
+
+        if (!$response->successful()) {
+            throw new SocialMediaException('Failed to get user profile: ' . $response->body());
+        }
+
+        $data = $response->json();
+        return $data['data'] ?? [];
+    }
+
+    /**
+     * Disconnect from Twitter/X (revoke access token).
+     *
+     * @param string $accessToken
+     * @param string|null $accessTokenSecret Not used for OAuth 2.0, kept for compatibility
+     * @return bool
+     */
+    public static function disconnect(string $accessToken, ?string $accessTokenSecret = null): bool
+    {
+        $enableLogging = config('social_media_publisher.enable_logging', true);
+        
+        try {
+            $clientId = config('social_media_publisher.x_client_id');
+            $clientSecret = config('social_media_publisher.x_client_secret');
+
+            if (!$clientId || !$clientSecret) {
+                if ($enableLogging) {
+                    Log::error('Twitter/X disconnect failed: missing credentials', [
+                        'platform' => 'twitter',
+                    ]);
+                }
+                return false;
             }
 
-            self::$instance = new self($bearerToken, $apiKey, $apiSecret, $accessToken, $accessTokenSecret);
+            // Twitter/X OAuth 2.0 revoke endpoint
+            $revokeUrl = 'https://api.twitter.com/2/oauth2/revoke';
+            
+            if ($enableLogging) {
+                Log::info('Revoking Twitter/X access token', [
+                    'platform' => 'twitter',
+                ]);
+            }
+            
+            $timeout = config('social_media_publisher.timeout', 30);
+            $response = Http::timeout($timeout)
+                ->withBasicAuth($clientId, $clientSecret)
+                ->asForm()
+                ->post($revokeUrl, [
+                    'token' => $accessToken,
+                    'token_type_hint' => 'access_token',
+                ]);
+
+            if ($response->successful()) {
+                if ($enableLogging) {
+                    Log::info('Twitter/X access token revoked successfully', [
+                        'platform' => 'twitter',
+                    ]);
+                }
+                return true;
+            }
+
+            if ($enableLogging) {
+                Log::error('Failed to revoke Twitter/X access token', [
+                    'platform' => 'twitter',
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                ]);
+            }
+            return false;
+        } catch (\Exception $e) {
+            if ($enableLogging) {
+                Log::error('Failed to disconnect Twitter/X', [
+                    'platform' => 'twitter',
+                    'error' => $e->getMessage(),
+                    'exception' => get_class($e),
+                ]);
+            }
+            return false;
         }
-        return self::$instance;
     }
 
     /**
@@ -115,10 +423,19 @@ class TwitterService extends SocialMediaService implements ShareInterface, Share
 
         try {
             $response = $this->sendRequest($url, 'post', $params);
-            Log::info('Twitter post shared successfully', ['tweet_id' => $response['data']['id'] ?? null]);
+            $this->log('info', 'Twitter post shared successfully', [
+                'platform' => 'twitter',
+                'tweet_id' => $response['data']['id'] ?? null,
+                'caption_length' => strlen($caption),
+            ]);
             return $response;
         } catch (\Exception $e) {
-            Log::error('Failed to share to Twitter', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to share to Twitter', [
+                'platform' => 'twitter',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'url' => $url,
+            ]);
             throw new SocialMediaException('Failed to share to Twitter: ' . $e->getMessage());
         }
     }
@@ -149,10 +466,19 @@ class TwitterService extends SocialMediaService implements ShareInterface, Share
             ];
 
             $response = $this->sendRequest($url, 'post', $params);
-            Log::info('Twitter image post shared successfully', ['tweet_id' => $response['data']['id'] ?? null]);
+            $this->log('info', 'Twitter image post shared successfully', [
+                'platform' => 'twitter',
+                'tweet_id' => $response['data']['id'] ?? null,
+                'caption_length' => strlen($caption),
+            ]);
             return $response;
         } catch (\Exception $e) {
-            Log::error('Failed to share image to Twitter', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to share image to Twitter', [
+                'platform' => 'twitter',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'image_url' => $image_url,
+            ]);
             throw new SocialMediaException('Failed to share image to Twitter: ' . $e->getMessage());
         }
     }
@@ -183,10 +509,19 @@ class TwitterService extends SocialMediaService implements ShareInterface, Share
             ];
 
             $response = $this->sendRequest($url, 'post', $params);
-            Log::info('Twitter video post shared successfully', ['tweet_id' => $response['data']['id'] ?? null]);
+            $this->log('info', 'Twitter video post shared successfully', [
+                'platform' => 'twitter',
+                'tweet_id' => $response['data']['id'] ?? null,
+                'caption_length' => strlen($caption),
+            ]);
             return $response;
         } catch (\Exception $e) {
-            Log::error('Failed to share video to Twitter', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to share video to Twitter', [
+                'platform' => 'twitter',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'video_url' => $video_url,
+            ]);
             throw new SocialMediaException('Failed to share video to Twitter: ' . $e->getMessage());
         }
     }
@@ -209,7 +544,11 @@ class TwitterService extends SocialMediaService implements ShareInterface, Share
 
             return $this->sendRequest($url, 'get', $params);
         } catch (\Exception $e) {
-            Log::error('Failed to get Twitter timeline', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to get Twitter timeline', [
+                'platform' => 'twitter',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+            ]);
             throw new SocialMediaException('Failed to get Twitter timeline: ' . $e->getMessage());
         }
     }
@@ -230,7 +569,11 @@ class TwitterService extends SocialMediaService implements ShareInterface, Share
 
             return $this->sendRequest($url, 'get', $params);
         } catch (\Exception $e) {
-            Log::error('Failed to get Twitter user info', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to get Twitter user info', [
+                'platform' => 'twitter',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+            ]);
             throw new SocialMediaException('Failed to get Twitter user info: ' . $e->getMessage());
         }
     }

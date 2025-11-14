@@ -15,28 +15,51 @@ class FacebookServiceTest extends TestCase
         parent::setUp();
         
         config([
-            'autopost.facebook_access_token' => 'test_facebook_token',
-            'autopost.facebook_page_id' => 'test_page_id',
-            'autopost.facebook_api_version' => 'v20.0',
+            'social_media_publisher.facebook_access_token' => 'test_facebook_token',
+            'social_media_publisher.facebook_page_id' => 'test_page_id',
+            'social_media_publisher.facebook_api_version' => 'v20.0',
         ]);
     }
 
-    public function testFacebookServiceSingleton()
+    public function testGetInstanceThrowsException()
     {
-        $service1 = FacebookService::getInstance();
-        $service2 = FacebookService::getInstance();
-        
-        $this->assertSame($service1, $service2);
-    }
-
-    public function testFacebookServiceWithMissingCredentials()
-    {
-        config(['autopost.facebook_access_token' => null]);
-        
         $this->expectException(SocialMediaException::class);
-        $this->expectExceptionMessage('Facebook API credentials are not fully configured');
+        $this->expectExceptionMessage('OAuth connection required');
         
         FacebookService::getInstance();
+    }
+
+    public function testForConnection()
+    {
+        $connection = $this->createFacebookConnection();
+        
+        $service = FacebookService::forConnection($connection);
+        
+        $this->assertInstanceOf(FacebookService::class, $service);
+    }
+
+    public function testForConnectionWithWrongPlatform()
+    {
+        $connection = $this->createLinkedInConnection();
+        
+        $this->expectException(SocialMediaException::class);
+        $this->expectExceptionMessage('Connection is not for Facebook platform');
+        
+        FacebookService::forConnection($connection);
+    }
+
+    public function testForConnectionWithMissingCredentials()
+    {
+        $connection = $this->createConnection([
+            'platform' => 'facebook',
+            'access_token' => null,
+            'metadata' => [],
+        ]);
+        
+        $this->expectException(SocialMediaException::class);
+        $this->expectExceptionMessage('Facebook connection is missing required credentials');
+        
+        FacebookService::forConnection($connection);
     }
 
     public function testShareSuccess()
@@ -45,7 +68,8 @@ class FacebookServiceTest extends TestCase
             'https://graph.facebook.com/v20.0/test_page_id/feed' => Http::response(['id' => '123'], 200),
         ]);
 
-        $service = FacebookService::getInstance();
+        $connection = $this->createFacebookConnection();
+        $service = FacebookService::forConnection($connection);
         $result = $service->share('Test post', 'https://example.com');
 
         $this->assertArrayHasKey('id', $result);
@@ -58,7 +82,8 @@ class FacebookServiceTest extends TestCase
             'https://graph.facebook.com/v20.0/test_page_id/photos' => Http::response(['id' => '456'], 200),
         ]);
 
-        $service = FacebookService::getInstance();
+        $connection = $this->createFacebookConnection();
+        $service = FacebookService::forConnection($connection);
         $result = $service->shareImage('Test image', 'https://example.com/image.jpg');
 
         $this->assertArrayHasKey('id', $result);
@@ -71,7 +96,8 @@ class FacebookServiceTest extends TestCase
             'https://graph.facebook.com/v20.0/test_page_id/videos' => Http::response(['id' => '789'], 200),
         ]);
 
-        $service = FacebookService::getInstance();
+        $connection = $this->createFacebookConnection();
+        $service = FacebookService::forConnection($connection);
         $result = $service->shareVideo('Test video', 'https://example.com/video.mp4');
 
         $this->assertArrayHasKey('id', $result);
@@ -89,7 +115,8 @@ class FacebookServiceTest extends TestCase
             ], 200),
         ]);
 
-        $service = FacebookService::getInstance();
+        $connection = $this->createFacebookConnection();
+        $service = FacebookService::forConnection($connection);
         $result = $service->getPageInfo();
 
         $this->assertArrayHasKey('id', $result);
@@ -110,7 +137,8 @@ class FacebookServiceTest extends TestCase
             ], 200),
         ]);
 
-        $service = FacebookService::getInstance();
+        $connection = $this->createFacebookConnection();
+        $service = FacebookService::forConnection($connection);
         $result = $service->getPageInsights(['page_impressions']);
 
         $this->assertArrayHasKey('data', $result);
@@ -131,7 +159,8 @@ class FacebookServiceTest extends TestCase
             ], 200),
         ]);
 
-        $service = FacebookService::getInstance();
+        $connection = $this->createFacebookConnection();
+        $service = FacebookService::forConnection($connection);
         $result = $service->getPageInsights(
             ['page_impressions'],
             ['since' => '2024-01-01', 'until' => '2024-01-31']
@@ -142,7 +171,8 @@ class FacebookServiceTest extends TestCase
 
     public function testShareWithEmptyCaption()
     {
-        $service = FacebookService::getInstance();
+        $connection = $this->createFacebookConnection();
+        $service = FacebookService::forConnection($connection);
         
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('Caption cannot be empty');
@@ -152,7 +182,8 @@ class FacebookServiceTest extends TestCase
 
     public function testShareWithInvalidUrl()
     {
-        $service = FacebookService::getInstance();
+        $connection = $this->createFacebookConnection();
+        $service = FacebookService::forConnection($connection);
         
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('Invalid URL provided');
@@ -168,7 +199,8 @@ class FacebookServiceTest extends TestCase
             ], 400),
         ]);
 
-        $service = FacebookService::getInstance();
+        $connection = $this->createFacebookConnection();
+        $service = FacebookService::forConnection($connection);
         
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('Failed to share to Facebook');
@@ -184,7 +216,8 @@ class FacebookServiceTest extends TestCase
             ], 400),
         ]);
 
-        $service = FacebookService::getInstance();
+        $connection = $this->createFacebookConnection();
+        $service = FacebookService::forConnection($connection);
         
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('Failed to share image to Facebook');
@@ -200,7 +233,8 @@ class FacebookServiceTest extends TestCase
             ], 400),
         ]);
 
-        $service = FacebookService::getInstance();
+        $connection = $this->createFacebookConnection();
+        $service = FacebookService::forConnection($connection);
         
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('Failed to share video to Facebook');
@@ -216,7 +250,8 @@ class FacebookServiceTest extends TestCase
             ], 400),
         ]);
 
-        $service = FacebookService::getInstance();
+        $connection = $this->createFacebookConnection();
+        $service = FacebookService::forConnection($connection);
         
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('Failed to get Facebook page info');
@@ -232,7 +267,8 @@ class FacebookServiceTest extends TestCase
             ], 400),
         ]);
 
-        $service = FacebookService::getInstance();
+        $connection = $this->createFacebookConnection();
+        $service = FacebookService::forConnection($connection);
         
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('Failed to get Facebook page insights');
@@ -250,7 +286,8 @@ class FacebookServiceTest extends TestCase
             'https://graph.facebook.com/v20.0/test_page_id/feed' => Http::response(['id' => '123'], 200),
         ]);
 
-        $service = FacebookService::getInstance();
+        $connection = $this->createFacebookConnection();
+        $service = FacebookService::forConnection($connection);
         $service->share('Test post', 'https://example.com');
     }
 
@@ -266,7 +303,8 @@ class FacebookServiceTest extends TestCase
             ], 400),
         ]);
 
-        $service = FacebookService::getInstance();
+        $connection = $this->createFacebookConnection();
+        $service = FacebookService::forConnection($connection);
         
         $this->expectException(SocialMediaException::class);
         $service->share('Test post', 'https://example.com');
@@ -281,7 +319,8 @@ class FacebookServiceTest extends TestCase
                 ->push(['id' => '123'], 200),
         ]);
 
-        $service = FacebookService::getInstance();
+        $connection = $this->createFacebookConnection();
+        $service = FacebookService::forConnection($connection);
         $result = $service->share('Test post', 'https://example.com');
 
         $this->assertArrayHasKey('id', $result);
@@ -290,13 +329,14 @@ class FacebookServiceTest extends TestCase
 
     public function testTimeoutConfiguration()
     {
-        config(['autopost.timeout' => 60]);
+        config(['social_media_publisher.timeout' => 60]);
 
         Http::fake([
             'https://graph.facebook.com/v20.0/test_page_id/feed' => Http::response(['id' => '123'], 200),
         ]);
 
-        $service = FacebookService::getInstance();
+        $connection = $this->createFacebookConnection();
+        $service = FacebookService::forConnection($connection);
         $service->share('Test post', 'https://example.com');
 
         Http::assertSent(function ($request) {

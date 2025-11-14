@@ -2,11 +2,13 @@
 
 namespace mantix\LaravelSocialMediaPublisher\Services;
 
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use mantix\LaravelSocialMediaPublisher\Contracts\ShareImagePostInterface;
 use mantix\LaravelSocialMediaPublisher\Contracts\ShareInterface;
 use mantix\LaravelSocialMediaPublisher\Contracts\ShareVideoPostInterface;
 use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
+use mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 
 /**
  * Class LinkedInService
@@ -56,22 +58,259 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
     }
 
     /**
-     * Get the singleton instance of LinkedInService.
+     * Get instance - OAuth connection required.
+     * 
+     * @return LinkedInService
+     * @throws SocialMediaException
+     * @deprecated Use forConnection() with a SocialMediaConnection instead
      */
     public static function getInstance(): LinkedInService
     {
-        if (self::$instance === null) {
-            $accessToken = config('autopost.linkedin_access_token');
-            $personUrn = config('autopost.linkedin_person_urn');
-            $organizationUrn = config('autopost.linkedin_organization_urn');
+        throw new SocialMediaException('OAuth connection required. Please use forConnection() with a SocialMediaConnection or authenticate via OAuth first.');
+    }
 
-            if (!$accessToken || !$personUrn) {
-                throw new SocialMediaException('LinkedIn credentials are not properly configured.');
-            }
+    /**
+     * Create a new instance with specific credentials.
+     *
+     * @param string $accessToken
+     * @param string $personUrn
+     * @param string|null $organizationUrn
+     * @return LinkedInService
+     */
+    public static function withCredentials(string $accessToken, string $personUrn, ?string $organizationUrn = null): LinkedInService
+    {
+        return new self($accessToken, $personUrn, $organizationUrn);
+    }
 
-            self::$instance = new self($accessToken, $personUrn, $organizationUrn);
+    /**
+     * Create a new instance from a SocialMediaConnection.
+     *
+     * @param SocialMediaConnection $connection
+     * @return LinkedInService
+     * @throws SocialMediaException
+     */
+    public static function forConnection(SocialMediaConnection $connection): LinkedInService
+    {
+        if ($connection->platform !== 'linkedin') {
+            throw new SocialMediaException('Connection is not for LinkedIn platform.');
         }
-        return self::$instance;
+
+        $accessToken = $connection->getDecryptedAccessToken();
+        $metadata = $connection->metadata ?? [];
+        $personUrn = $metadata['person_urn'] ?? $connection->platform_user_id;
+        $organizationUrn = $metadata['organization_urn'] ?? null;
+
+        if (!$accessToken || !$personUrn) {
+            throw new SocialMediaException('LinkedIn connection is missing required credentials.');
+        }
+
+        return new self($accessToken, $personUrn, $organizationUrn);
+    }
+
+    /**
+     * Get the authorization URL for LinkedIn OAuth.
+     *
+     * @param string $redirectUri
+     * @param array $scopes
+     * @param string|null $state
+     * @return string
+     * @throws SocialMediaException
+     */
+    public static function getAuthorizationUrl(string $redirectUri, array $scopes = ['r_liteprofile', 'r_emailaddress', 'w_member_social'], ?string $state = null): string
+    {
+        $clientId = config('social_media_publisher.linkedin_client_id');
+
+        if (!$clientId) {
+            throw new SocialMediaException('LinkedIn Client ID must be configured for OAuth.');
+        }
+
+        $state = $state ?? bin2hex(random_bytes(16));
+        $scopeString = implode(' ', $scopes);
+
+        $authUrl = sprintf(
+            'https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=%s&redirect_uri=%s&state=%s&scope=%s',
+            urlencode($clientId),
+            urlencode($redirectUri),
+            urlencode($state),
+            urlencode($scopeString)
+        );
+
+        if (config('social_media_publisher.enable_logging', true)) {
+            Log::info('LinkedIn OAuth authorization URL generated', [
+                'platform' => 'linkedin',
+                'redirect_uri' => $redirectUri,
+                'scopes' => $scopes,
+                'state' => $state,
+                'has_client_id' => !empty($clientId),
+            ]);
+        }
+
+        return $authUrl;
+    }
+
+    /**
+     * Handle the OAuth callback and exchange code for access token.
+     *
+     * @param string $code
+     * @param string $redirectUri
+     * @return array
+     * @throws SocialMediaException
+     */
+    public static function handleCallback(string $code, string $redirectUri): array
+    {
+        $enableLogging = config('social_media_publisher.enable_logging', true);
+        
+        if ($enableLogging) {
+            Log::info('LinkedIn OAuth callback initiated', [
+                'platform' => 'linkedin',
+                'redirect_uri' => $redirectUri,
+                'has_code' => !empty($code),
+            ]);
+        }
+
+        $clientId = config('social_media_publisher.linkedin_client_id');
+        $clientSecret = config('social_media_publisher.linkedin_client_secret');
+
+        if (!$clientId || !$clientSecret) {
+            if ($enableLogging) {
+                Log::error('LinkedIn OAuth callback failed: missing credentials', [
+                    'platform' => 'linkedin',
+                    'has_client_id' => !empty($clientId),
+                    'has_client_secret' => !empty($clientSecret),
+                ]);
+            }
+            throw new SocialMediaException('LinkedIn Client ID and Client Secret must be configured for OAuth.');
+        }
+
+        // Exchange code for access token
+        $tokenUrl = 'https://www.linkedin.com/oauth/v2/accessToken';
+        
+        if ($enableLogging) {
+            Log::debug('Exchanging LinkedIn OAuth code for access token', [
+                'platform' => 'linkedin',
+                'token_url' => $tokenUrl,
+                'redirect_uri' => $redirectUri,
+            ]);
+        }
+        
+        $timeout = config('social_media_publisher.timeout', 30);
+        $response = Http::timeout($timeout)->asForm()->post($tokenUrl, [
+            'grant_type' => 'authorization_code',
+            'code' => $code,
+            'redirect_uri' => $redirectUri,
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
+        ]);
+
+        if (!$response->successful()) {
+            if ($enableLogging) {
+                Log::error('LinkedIn OAuth token exchange failed', [
+                    'platform' => 'linkedin',
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                ]);
+            }
+            throw new SocialMediaException('Failed to exchange code for access token: ' . $response->body());
+        }
+
+        $tokenData = $response->json();
+        $accessToken = $tokenData['access_token'] ?? null;
+
+        if (!$accessToken) {
+            if ($enableLogging) {
+                Log::error('LinkedIn OAuth access token not found in response', [
+                    'platform' => 'linkedin',
+                    'response_keys' => array_keys($tokenData),
+                ]);
+            }
+            throw new SocialMediaException('Access token not found in response.');
+        }
+
+        if ($enableLogging) {
+            Log::info('LinkedIn OAuth access token obtained', [
+                'platform' => 'linkedin',
+                'token_type' => $tokenData['token_type'] ?? 'unknown',
+                'expires_in' => $tokenData['expires_in'] ?? null,
+            ]);
+        }
+
+        // Get user profile
+        $profileUrl = 'https://api.linkedin.com/v2/me';
+        
+        if ($enableLogging) {
+            Log::debug('Fetching LinkedIn user profile', [
+                'platform' => 'linkedin',
+            ]);
+        }
+        
+        $timeout = config('social_media_publisher.timeout', 30);
+        $profileResponse = Http::timeout($timeout)->withHeaders([
+            'Authorization' => 'Bearer ' . $accessToken,
+        ])->get($profileUrl);
+
+        $profile = [];
+        if ($profileResponse->successful()) {
+            $profile = $profileResponse->json();
+            
+            if ($enableLogging) {
+                Log::info('LinkedIn user profile retrieved', [
+                    'platform' => 'linkedin',
+                    'profile_id' => $profile['id'] ?? null,
+                ]);
+            }
+        } else {
+            if ($enableLogging) {
+                Log::warning('Failed to retrieve LinkedIn user profile', [
+                    'platform' => 'linkedin',
+                    'status' => $profileResponse->status(),
+                ]);
+            }
+        }
+
+        if ($enableLogging) {
+            Log::info('LinkedIn OAuth callback completed successfully', [
+                'platform' => 'linkedin',
+                'has_access_token' => !empty($accessToken),
+                'has_profile' => !empty($profile),
+            ]);
+        }
+
+        return [
+            'access_token' => $accessToken,
+            'expires_in' => $tokenData['expires_in'] ?? null,
+            'token_type' => $tokenData['token_type'] ?? 'bearer',
+            'profile' => $profile,
+        ];
+    }
+
+    /**
+     * Disconnect from LinkedIn by revoking the access token.
+     *
+     * @param string $accessToken
+     * @return bool
+     */
+    public static function disconnect(string $accessToken): bool
+    {
+        try {
+            $revokeUrl = 'https://www.linkedin.com/oauth/v2/revoke';
+            $timeout = config('social_media_publisher.timeout', 30);
+            $response = Http::timeout($timeout)->asForm()->post($revokeUrl, [
+                'token' => $accessToken,
+                'client_id' => config('social_media_publisher.linkedin_client_id'),
+                'client_secret' => config('social_media_publisher.linkedin_client_secret'),
+            ]);
+
+            return $response->successful();
+        } catch (\Exception $e) {
+            if (config('social_media_publisher.enable_logging', true)) {
+                Log::error('Failed to disconnect LinkedIn', [
+                    'platform' => 'linkedin',
+                    'error' => $e->getMessage(),
+                    'exception' => get_class($e),
+                ]);
+            }
+            return false;
+        }
     }
 
     /**
@@ -117,10 +356,20 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
             ];
 
             $response = $this->sendRequest($url_endpoint, 'post', $params);
-            Log::info('LinkedIn post shared successfully', ['post_id' => $response['id'] ?? null]);
+            $this->log('info', 'LinkedIn post shared successfully', [
+                'platform' => 'linkedin',
+                'post_id' => $response['id'] ?? null,
+                'person_urn' => $this->person_urn,
+                'caption_length' => strlen($caption),
+            ]);
             return $response;
         } catch (\Exception $e) {
-            Log::error('Failed to share to LinkedIn', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to share to LinkedIn', [
+                'platform' => 'linkedin',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'url' => $url,
+            ]);
             throw new SocialMediaException('Failed to share to LinkedIn: ' . $e->getMessage());
         }
     }
@@ -172,10 +421,20 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
             ];
 
             $response = $this->sendRequest($url, 'post', $params);
-            Log::info('LinkedIn image post shared successfully', ['post_id' => $response['id'] ?? null]);
+            $this->log('info', 'LinkedIn image post shared successfully', [
+                'platform' => 'linkedin',
+                'post_id' => $response['id'] ?? null,
+                'person_urn' => $this->person_urn,
+                'caption_length' => strlen($caption),
+            ]);
             return $response;
         } catch (\Exception $e) {
-            Log::error('Failed to share image to LinkedIn', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to share image to LinkedIn', [
+                'platform' => 'linkedin',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'image_url' => $image_url,
+            ]);
             throw new SocialMediaException('Failed to share image to LinkedIn: ' . $e->getMessage());
         }
     }
@@ -227,10 +486,20 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
             ];
 
             $response = $this->sendRequest($url, 'post', $params);
-            Log::info('LinkedIn video post shared successfully', ['post_id' => $response['id'] ?? null]);
+            $this->log('info', 'LinkedIn video post shared successfully', [
+                'platform' => 'linkedin',
+                'post_id' => $response['id'] ?? null,
+                'person_urn' => $this->person_urn,
+                'caption_length' => strlen($caption),
+            ]);
             return $response;
         } catch (\Exception $e) {
-            Log::error('Failed to share video to LinkedIn', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to share video to LinkedIn', [
+                'platform' => 'linkedin',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'video_url' => $video_url,
+            ]);
             throw new SocialMediaException('Failed to share video to LinkedIn: ' . $e->getMessage());
         }
     }
@@ -282,10 +551,21 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
             ];
 
             $response = $this->sendRequest($url_endpoint, 'post', $params);
-            Log::info('LinkedIn company page post shared successfully', ['post_id' => $response['id'] ?? null]);
+            $this->log('info', 'LinkedIn company page post shared successfully', [
+                'platform' => 'linkedin',
+                'post_id' => $response['id'] ?? null,
+                'organization_urn' => $this->organization_urn,
+                'caption_length' => strlen($caption),
+            ]);
             return $response;
         } catch (\Exception $e) {
-            Log::error('Failed to share to LinkedIn company page', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to share to LinkedIn company page', [
+                'platform' => 'linkedin',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'organization_urn' => $this->organization_urn,
+                'url' => $url,
+            ]);
             throw new SocialMediaException('Failed to share to LinkedIn company page: ' . $e->getMessage());
         }
     }
@@ -306,7 +586,11 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
 
             return $this->sendRequest($url, 'get', $params);
         } catch (\Exception $e) {
-            Log::error('Failed to get LinkedIn user info', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to get LinkedIn user info', [
+                'platform' => 'linkedin',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+            ]);
             throw new SocialMediaException('Failed to get LinkedIn user info: ' . $e->getMessage());
         }
     }

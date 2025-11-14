@@ -15,9 +15,9 @@ class LinkedInServiceTest extends TestCase
         parent::setUp();
         
         config([
-            'autopost.linkedin_access_token' => 'test_linkedin_token',
-            'autopost.linkedin_person_urn' => 'test_person_urn',
-            'autopost.linkedin_organization_urn' => 'test_organization_urn',
+            'social_media_publisher.linkedin_access_token' => 'test_linkedin_token',
+            'social_media_publisher.linkedin_person_urn' => 'test_person_urn',
+            'social_media_publisher.linkedin_organization_urn' => 'test_organization_urn',
         ]);
     }
 
@@ -31,7 +31,7 @@ class LinkedInServiceTest extends TestCase
 
     public function testLinkedInServiceWithMissingCredentials()
     {
-        config(['autopost.linkedin_access_token' => null]);
+        config(['social_media_publisher.linkedin_access_token' => null]);
         
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('LinkedIn API credentials are not fully configured');
@@ -223,7 +223,7 @@ class LinkedInServiceTest extends TestCase
 
     public function testShareToCompanyPageWithoutOrganizationUrn()
     {
-        config(['autopost.linkedin_organization_urn' => null]);
+        config(['social_media_publisher.linkedin_organization_urn' => null]);
         
         $service = LinkedInService::getInstance();
         
@@ -283,7 +283,7 @@ class LinkedInServiceTest extends TestCase
 
     public function testTimeoutConfiguration()
     {
-        config(['autopost.timeout' => 60]);
+        config(['social_media_publisher.timeout' => 60]);
 
         Http::fake([
             'https://api.linkedin.com/v2/ugcPosts' => Http::response(['id' => '123'], 200),

@@ -56,22 +56,40 @@ class YouTubeService extends SocialMediaService implements ShareInterface, Share
     }
 
     /**
-     * Get the singleton instance of YouTubeService.
+     * Get instance - OAuth connection required.
+     * 
+     * @return YouTubeService
+     * @throws SocialMediaException
+     * @deprecated Use forConnection() with a SocialMediaConnection instead
      */
     public static function getInstance(): YouTubeService
     {
-        if (self::$instance === null) {
-            $apiKey = config('autopost.youtube_api_key');
-            $accessToken = config('autopost.youtube_access_token');
-            $channelId = config('autopost.youtube_channel_id');
+        throw new SocialMediaException('OAuth connection required. Please use forConnection() with a SocialMediaConnection or authenticate via OAuth first.');
+    }
 
-            if (!$apiKey || !$accessToken || !$channelId) {
-                throw new SocialMediaException('YouTube credentials are not properly configured.');
-            }
-
-            self::$instance = new self($apiKey, $accessToken, $channelId);
+    /**
+     * Create a new instance from a SocialMediaConnection.
+     *
+     * @param \mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection
+     * @return YouTubeService
+     * @throws SocialMediaException
+     */
+    public static function forConnection(\mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection): YouTubeService
+    {
+        if ($connection->platform !== 'youtube') {
+            throw new SocialMediaException('Connection is not for YouTube platform.');
         }
-        return self::$instance;
+
+        $accessToken = $connection->getDecryptedAccessToken();
+        $metadata = $connection->metadata ?? [];
+        $apiKey = $metadata['api_key'] ?? config('social_media_publisher.youtube_client_id');
+        $channelId = $connection->platform_user_id ?? $metadata['channel_id'] ?? null;
+
+        if (!$accessToken || !$apiKey || !$channelId) {
+            throw new SocialMediaException('YouTube connection is missing required credentials.');
+        }
+
+        return new self($apiKey, $accessToken, $channelId);
     }
 
     /**
@@ -92,7 +110,12 @@ class YouTubeService extends SocialMediaService implements ShareInterface, Share
             // We'll create a community post
             return $this->createCommunityPost($caption, $url);
         } catch (\Exception $e) {
-            Log::error('Failed to share to YouTube', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to share to YouTube', [
+                'platform' => 'youtube',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'url' => $url,
+            ]);
             throw new SocialMediaException('Failed to share to YouTube: ' . $e->getMessage());
         }
     }
@@ -115,7 +138,12 @@ class YouTubeService extends SocialMediaService implements ShareInterface, Share
             // We'll create a community post with the image
             return $this->createCommunityPost($caption, $image_url, 'image');
         } catch (\Exception $e) {
-            Log::error('Failed to share image to YouTube', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to share image to YouTube', [
+                'platform' => 'youtube',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'image_url' => $image_url,
+            ]);
             throw new SocialMediaException('Failed to share image to YouTube: ' . $e->getMessage());
         }
     }
@@ -155,10 +183,21 @@ class YouTubeService extends SocialMediaService implements ShareInterface, Share
             $uploadUrl = $this->buildApiUrl('videos');
             $response = $this->uploadVideo($uploadUrl, $metadata, $videoContent);
             
-            Log::info('YouTube video post shared successfully', ['video_id' => $response['id'] ?? null]);
+            $this->log('info', 'YouTube video post shared successfully', [
+                'platform' => 'youtube',
+                'video_id' => $response['id'] ?? null,
+                'channel_id' => $this->channel_id,
+                'title_length' => strlen($title),
+            ]);
             return $response;
         } catch (\Exception $e) {
-            Log::error('Failed to share video to YouTube', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to share video to YouTube', [
+                'platform' => 'youtube',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'channel_id' => $this->channel_id,
+                'video_url' => $video_url,
+            ]);
             throw new SocialMediaException('Failed to share video to YouTube: ' . $e->getMessage());
         }
     }
@@ -190,10 +229,19 @@ class YouTubeService extends SocialMediaService implements ShareInterface, Share
             ];
 
             $response = $this->sendRequest($postUrl, 'post', $params);
-            Log::info('YouTube community post created successfully', ['post_id' => $response['id'] ?? null]);
+            $this->log('info', 'YouTube community post created successfully', [
+                'platform' => 'youtube',
+                'post_id' => $response['id'] ?? null,
+                'channel_id' => $this->channel_id,
+            ]);
             return $response;
         } catch (\Exception $e) {
-            Log::error('Failed to create YouTube community post', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to create YouTube community post', [
+                'platform' => 'youtube',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'channel_id' => $this->channel_id,
+            ]);
             throw new SocialMediaException('Failed to create YouTube community post: ' . $e->getMessage());
         }
     }
@@ -258,7 +306,12 @@ class YouTubeService extends SocialMediaService implements ShareInterface, Share
 
             return $this->sendRequest($url, 'get', $params);
         } catch (\Exception $e) {
-            Log::error('Failed to get YouTube channel info', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to get YouTube channel info', [
+                'platform' => 'youtube',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'channel_id' => $this->channel_id,
+            ]);
             throw new SocialMediaException('Failed to get YouTube channel info: ' . $e->getMessage());
         }
     }
@@ -285,7 +338,13 @@ class YouTubeService extends SocialMediaService implements ShareInterface, Share
 
             return $this->sendRequest($url, 'get', $params);
         } catch (\Exception $e) {
-            Log::error('Failed to get YouTube channel videos', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to get YouTube channel videos', [
+                'platform' => 'youtube',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'channel_id' => $this->channel_id,
+                'limit' => $limit,
+            ]);
             throw new SocialMediaException('Failed to get YouTube channel videos: ' . $e->getMessage());
         }
     }
@@ -309,7 +368,12 @@ class YouTubeService extends SocialMediaService implements ShareInterface, Share
 
             return $this->sendRequest($url, 'get', $params);
         } catch (\Exception $e) {
-            Log::error('Failed to get YouTube video analytics', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to get YouTube video analytics', [
+                'platform' => 'youtube',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'video_id' => $videoId,
+            ]);
             throw new SocialMediaException('Failed to get YouTube video analytics: ' . $e->getMessage());
         }
     }

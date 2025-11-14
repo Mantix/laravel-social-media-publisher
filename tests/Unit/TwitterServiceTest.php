@@ -15,11 +15,11 @@ class TwitterServiceTest extends TestCase
         parent::setUp();
         
         config([
-            'autopost.twitter_bearer_token' => 'test_bearer_token',
-            'autopost.twitter_api_key' => 'test_api_key',
-            'autopost.twitter_api_secret' => 'test_api_secret',
-            'autopost.twitter_access_token' => 'test_access_token',
-            'autopost.twitter_access_token_secret' => 'test_access_token_secret',
+            'social_media_publisher.twitter_bearer_token' => 'test_bearer_token',
+            'social_media_publisher.twitter_api_key' => 'test_api_key',
+            'social_media_publisher.twitter_api_secret' => 'test_api_secret',
+            'social_media_publisher.twitter_access_token' => 'test_access_token',
+            'social_media_publisher.twitter_access_token_secret' => 'test_access_token_secret',
         ]);
     }
 
@@ -33,7 +33,7 @@ class TwitterServiceTest extends TestCase
 
     public function testTwitterServiceWithMissingCredentials()
     {
-        config(['autopost.twitter_bearer_token' => null]);
+        config(['social_media_publisher.twitter_bearer_token' => null]);
         
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('Twitter API credentials are not fully configured');
@@ -294,7 +294,7 @@ class TwitterServiceTest extends TestCase
 
     public function testTimeoutConfiguration()
     {
-        config(['autopost.timeout' => 60]);
+        config(['social_media_publisher.timeout' => 60]);
 
         Http::fake([
             'https://api.twitter.com/2/tweets' => Http::response(['data' => ['id' => '123']], 200),

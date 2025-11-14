@@ -15,8 +15,8 @@ class PinterestServiceTest extends TestCase
         parent::setUp();
         
         config([
-            'autopost.pinterest_access_token' => 'test_pinterest_token',
-            'autopost.pinterest_board_id' => 'test_board_id',
+            'social_media_publisher.pinterest_access_token' => 'test_pinterest_token',
+            'social_media_publisher.pinterest_board_id' => 'test_board_id',
         ]);
     }
 
@@ -30,7 +30,7 @@ class PinterestServiceTest extends TestCase
 
     public function testPinterestServiceWithMissingCredentials()
     {
-        config(['autopost.pinterest_access_token' => null]);
+        config(['social_media_publisher.pinterest_access_token' => null]);
         
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('Pinterest API credentials are not fully configured');
@@ -361,7 +361,7 @@ class PinterestServiceTest extends TestCase
 
     public function testTimeoutConfiguration()
     {
-        config(['autopost.timeout' => 60]);
+        config(['social_media_publisher.timeout' => 60]);
 
         Http::fake([
             'https://api.pinterest.com/v5/pins' => Http::response(['id' => 'pin123'], 200),

@@ -10,6 +10,8 @@ A comprehensive Laravel package for automatic social media publishing across **8
 ## 🌟 Features
 
 - **8 Social Media Platforms**: Facebook, Twitter/X, LinkedIn, Instagram, TikTok, YouTube, Pinterest, Telegram
+- **Multi-User & Multi-Entity Support**: Users, Companies, or any model can connect their own social media accounts and post on their behalf (polymorphic relationships)
+- **OAuth Integration**: Built-in OAuth flows for Facebook, LinkedIn, and Twitter
 - **Unified API**: Post to multiple platforms with a single command
 - **Individual Platform Access**: Direct access to each platform's specific features
 - **Comprehensive Content Types**: Text, Images, Videos, Documents, Stories, Carousels
@@ -49,76 +51,188 @@ A comprehensive Laravel package for automatic social media publishing across **8
 composer require mantix/laravel-social-media-publisher
 ```
 
-### Publish Configuration
+### Publish Configuration and Migrations
 
 ```bash
-php artisan vendor:publish --provider="mantix\LaravelSocialMediaPublisher\SocialShareServiceProvider" --tag=autopost
+# Publish configuration
+php artisan vendor:publish --provider="mantix\LaravelSocialMediaPublisher\SocialShareServiceProvider" --tag=social-media-publisher-config
+
+# Publish migrations
+php artisan vendor:publish --provider="mantix\LaravelSocialMediaPublisher\SocialShareServiceProvider" --tag=social-media-publisher-migrations
+
+# Run migrations
+php artisan migrate
 ```
 
 ## ⚙️ Configuration
 
 ### Environment Variables
 
-Add the following environment variables to your `.env` file:
+Add the following OAuth credentials to your `.env` file. These are required for users to authenticate their own social media accounts:
 
 ```env
-# Facebook
-FACEBOOK_ACCESS_TOKEN=your_facebook_access_token
-FACEBOOK_PAGE_ID=your_facebook_page_id
+# Facebook (OAuth 2.0)
+FACEBOOK_CLIENT_ID=your_facebook_client_id
+FACEBOOK_CLIENT_SECRET=your_facebook_client_secret
 
-# Twitter/X
-TWITTER_BEARER_TOKEN=your_twitter_bearer_token
-TWITTER_API_KEY=your_twitter_api_key
-TWITTER_API_SECRET=your_twitter_api_secret
-TWITTER_ACCESS_TOKEN=your_twitter_access_token
-TWITTER_ACCESS_TOKEN_SECRET=your_twitter_access_token_secret
+# Twitter/X (OAuth 2.0)
+X_CLIENT_ID=your_x_client_id
+X_CLIENT_SECRET=your_x_client_secret
+X_API_KEY=your_x_api_key
+X_API_SECRET_KEY=your_x_api_secret_key
 
-# LinkedIn
-LINKEDIN_ACCESS_TOKEN=your_linkedin_access_token
-LINKEDIN_PERSON_URN=your_linkedin_person_urn
-LINKEDIN_ORGANIZATION_URN=your_linkedin_organization_urn
+# LinkedIn (OAuth 2.0)
+LINKEDIN_CLIENT_ID=your_linkedin_client_id
+LINKEDIN_CLIENT_SECRET=your_linkedin_client_secret
 
-# Instagram
-INSTAGRAM_ACCESS_TOKEN=your_instagram_access_token
-INSTAGRAM_ACCOUNT_ID=your_instagram_account_id
+# Instagram (OAuth 2.0)
+INSTAGRAM_CLIENT_ID=your_instagram_client_id
+INSTAGRAM_CLIENT_SECRET=your_instagram_client_secret
 
-# TikTok
-TIKTOK_ACCESS_TOKEN=your_tiktok_access_token
-TIKTOK_CLIENT_KEY=your_tiktok_client_key
+# TikTok (OAuth 2.0)
+TIKTOK_CLIENT_ID=your_tiktok_client_id
 TIKTOK_CLIENT_SECRET=your_tiktok_client_secret
 
-# YouTube
-YOUTUBE_API_KEY=your_youtube_api_key
-YOUTUBE_ACCESS_TOKEN=your_youtube_access_token
-YOUTUBE_CHANNEL_ID=your_youtube_channel_id
+# YouTube (OAuth 2.0)
+YOUTUBE_CLIENT_ID=your_youtube_client_id
+YOUTUBE_CLIENT_SECRET=your_youtube_client_secret
 
-# Pinterest
-PINTEREST_ACCESS_TOKEN=your_pinterest_access_token
-PINTEREST_BOARD_ID=your_pinterest_board_id
+# Pinterest (OAuth 2.0)
+PINTEREST_CLIENT_ID=your_pinterest_client_id
+PINTEREST_CLIENT_SECRET=your_pinterest_client_secret
 
-# Telegram
+# Telegram (Bot API - No OAuth required)
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token
 TELEGRAM_CHAT_ID=your_telegram_chat_id
 ```
 
+### OAuth Routes Setup
+
+**Important**: OAuth callback routes are automatically registered by the package and excluded from CSRF protection. You only need to configure the callback URLs in each platform's developer portal.
+
+#### OAuth Authorization Routes
+
+You need to create authorization routes that redirect users to the OAuth provider. Add these to your `routes/web.php`:
+
+```php
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Route;
+use Instagram;
+
+// OAuth Authorization Routes
+Route::get('/auth/facebook', function () {
+    $redirectUri = route('social-media.facebook.callback');
+    return redirect(FacebookService::getAuthorizationUrl($redirectUri));
+})->name('social-media.facebook.authorize')->middleware('auth');
+
+Route::get('/auth/linkedin', function () {
+    $redirectUri = route('social-media.linkedin.callback');
+    return redirect(LinkedInService::getAuthorizationUrl($redirectUri));
+})->name('social-media.linkedin.authorize')->middleware('auth');
+
+// Add similar routes for other platforms...
+```
+
+**Note**: The callback routes (`/auth/facebook/callback`, `/auth/linkedin/callback`, etc.) are automatically registered by the package and excluded from CSRF protection. You don't need to define them manually.
+
+#### Customizing OAuth Callbacks
+
+The package includes a default `OAuthController` that handles callbacks. To customize the behavior, you can:
+
+1. **Publish the controller** (if needed in future versions):
+   ```bash
+   php artisan vendor:publish --tag=social-media-publisher-controller
+   ```
+
+2. **Configure redirect route** after OAuth success/error:
+   ```env
+   SOCIAL_MEDIA_OAUTH_REDIRECT_ROUTE=dashboard
+   ```
+
+3. **Extend the controller** in your application if you need custom logic.
+
+#### Default OAuth Controller Behavior
+
+The default controller:
+- Automatically saves connections to the `social_media_connections` table
+- Requires authenticated users (uses `auth()->user()`)
+- Redirects to the configured route (default: `dashboard`) with success/error messages
+- Handles errors gracefully with logging
+
+### OAuth Callback URLs Configuration
+
+**Important**: You must configure these callback URLs in each platform's developer portal. The callback URLs must match exactly your route URLs (e.g., `https://yourdomain.com/auth/facebook/callback`).
+
+#### Facebook
+1. Go to [Facebook Developers](https://developers.facebook.com/)
+2. Select your app → Settings → Basic
+3. Add your callback URL to "Valid OAuth Redirect URIs"
+4. Example: `https://yourdomain.com/auth/facebook/callback`
+
+#### Twitter/X
+1. Go to [Twitter Developer Portal](https://developer.twitter.com/)
+2. Select your app → Settings → User authentication settings
+3. Add your callback URL to "Callback URI / Redirect URL"
+4. Example: `https://yourdomain.com/auth/x/callback`
+
+#### LinkedIn
+1. Go to [LinkedIn Developers](https://www.linkedin.com/developers/)
+2. Select your app → Auth tab
+3. Add your callback URL to "Authorized redirect URLs for your app"
+4. Example: `https://yourdomain.com/auth/linkedin/callback`
+
+#### Instagram
+1. Go to [Facebook Developers](https://developers.facebook.com/) (Instagram uses Facebook's platform)
+2. Select your app → Products → Instagram → Basic Display
+3. Add your callback URL to "Valid OAuth Redirect URIs"
+4. Example: `https://yourdomain.com/auth/instagram/callback`
+
+#### TikTok
+1. Go to [TikTok Developers](https://developers.tiktok.com/)
+2. Select your app → Basic Information
+3. Add your callback URL to "Redirect URI"
+4. Example: `https://yourdomain.com/auth/tiktok/callback`
+
+#### YouTube
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Select your project → APIs & Services → Credentials
+3. Edit your OAuth 2.0 Client ID
+4. Add your callback URL to "Authorized redirect URIs"
+5. Example: `https://yourdomain.com/auth/youtube/callback`
+
+#### Pinterest
+1. Go to [Pinterest Developers](https://developers.pinterest.com/)
+2. Select your app → Settings
+3. Add your callback URL to "Redirect URIs"
+4. Example: `https://yourdomain.com/auth/pinterest/callback`
+
+
 ### Configuration File
 
-The published `config/autopost.php` file contains all configuration options:
+The published `config/social-media-publisher.php` file contains all configuration options:
 
 ```php
 return [
-    // Platform configurations
-    'facebook_access_token' => env('FACEBOOK_ACCESS_TOKEN'),
-    'facebook_page_id' => env('FACEBOOK_PAGE_ID'),
-    'facebook_api_version' => env('FACEBOOK_API_VERSION', 'v20.0'),
+    // Facebook Configuration (OAuth 2.0)
+    'facebook_client_id'     => env('FACEBOOK_CLIENT_ID'),
+    'facebook_client_secret'  => env('FACEBOOK_CLIENT_SECRET'),
+    'facebook_api_version'   => env('FACEBOOK_API_VERSION', 'v20.0'),
+    
+    // Twitter/X Configuration (OAuth 2.0)
+    'x_client_id'        => env('X_CLIENT_ID'),
+    'x_client_secret'    => env('X_CLIENT_SECRET'),
+    'x_api_key'          => env('X_API_KEY'),
+    'x_api_secret_key'   => env('X_API_SECRET_KEY'),
     
     // ... other platform configurations
     
     // General settings
-    'default_platforms' => ['facebook', 'twitter', 'linkedin'],
     'enable_logging' => env('SOCIAL_MEDIA_LOGGING', true),
     'timeout' => env('SOCIAL_MEDIA_TIMEOUT', 30),
     'retry_attempts' => env('SOCIAL_MEDIA_RETRY_ATTEMPTS', 3),
+    
+    // OAuth settings
+    'oauth_redirect_route' => env('SOCIAL_MEDIA_OAUTH_REDIRECT_ROUTE', 'dashboard'),
 ];
 ```
 
@@ -126,43 +240,133 @@ return [
 
 ### Basic Usage
 
+**Note**: All posting requires OAuth 2.0 connections. Users must authenticate their social media accounts through OAuth before posting. This is the only supported authentication method (except Telegram which uses Bot API).
+
 ```php
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 
-// Post to multiple platforms
-$result = SocialMedia::share(['facebook', 'twitter', 'linkedin'], 'Hello World!', 'https://example.com');
-
-// Post to all platforms
-$result = SocialMedia::shareToAll('Hello World!', 'https://example.com');
+// Post to multiple platforms (requires OAuth connections)
+$user = User::find(1);
+$result = SocialMedia::shareForOwner($user, ['facebook', 'twitter', 'linkedin'], 'Hello World!', 'https://example.com');
 
 // Share images
-$result = SocialMedia::shareImage(['instagram', 'pinterest'], 'Check this out!', 'https://example.com/image.jpg');
+$result = SocialMedia::shareImageForOwner($user, ['instagram', 'pinterest'], 'Check this out!', 'https://example.com/image.jpg');
 
 // Share videos
-$result = SocialMedia::shareVideo(['youtube', 'tiktok'], 'Watch this!', 'https://example.com/video.mp4');
+$result = SocialMedia::shareVideoForOwner($user, ['youtube', 'tiktok'], 'Watch this!', 'https://example.com/video.mp4');
 ```
+
+### Multi-User & Multi-Entity Support
+
+The package supports polymorphic relationships, allowing any model (User, Company, etc.) to have social media connections:
+
+```php
+use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+
+// Post on behalf of a User
+$user = User::find(1);
+$result = SocialMedia::shareForOwner($user, ['facebook', 'twitter'], 'Hello World!', 'https://example.com');
+
+// Post on behalf of a Company
+$company = Company::find(1);
+$result = SocialMedia::shareForOwner($company, ['facebook', 'linkedin'], 'Company Update!', 'https://example.com');
+
+// Get owner-specific platform service
+$facebookService = SocialMedia::platform('facebook', $user);
+$facebookService->share('Hello', 'https://example.com');
+
+// Or using class name and ID
+$result = SocialMedia::shareForOwner(Company::class, ['facebook'], 'Update', 'https://example.com', $companyId);
+```
+
+**Note**: All posting requires OAuth 2.0 connections. Users must authenticate their social media accounts through OAuth before posting. OAuth is the only supported authentication method (except Telegram which uses Bot API).
 
 ### Individual Platform Access
 
+**Note**: All platform facades require OAuth connections. Use `SocialMedia::platform()` with an owner instead.
+
 ```php
-use mantix\LaravelSocialMediaPublisher\Facades\FaceBook;
-use mantix\LaravelSocialMediaPublisher\Facades\Twitter;
-use mantix\LaravelSocialMediaPublisher\Facades\LinkedIn;
+use mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
+use mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
+
+// Get platform service for a user with OAuth connection
+$user = User::find(1);
 
 // Facebook
-FaceBook::share('Hello Facebook!', 'https://example.com');
-FaceBook::shareImage('Check this image!', 'https://example.com/image.jpg');
+$facebookService = SocialMedia::platform('facebook', $user);
+$facebookService->share('Hello Facebook!', 'https://example.com');
+$facebookService->shareImage('Check this image!', 'https://example.com/image.jpg');
 
 // Twitter
-Twitter::share('Hello Twitter!', 'https://example.com');
-Twitter::shareImage('Check this image!', 'https://example.com/image.jpg');
+$twitterService = SocialMedia::platform('twitter', $user);
+$twitterService->share('Hello Twitter!', 'https://example.com');
 
 // LinkedIn
-LinkedIn::share('Hello LinkedIn!', 'https://example.com');
-LinkedIn::shareToCompanyPage('Company update!', 'https://example.com');
+$linkedinService = SocialMedia::platform('linkedin', $user);
+$linkedinService->share('Hello LinkedIn!', 'https://example.com');
+$linkedinService->shareToCompanyPage('Company update!', 'https://example.com');
 ```
 
 ## 📖 Usage
+
+### Multi-User OAuth Flow
+
+#### 1. Get Authorization URL
+
+```php
+use mantix\LaravelSocialMediaPublisher\Services\FacebookService;
+use mantix\LaravelSocialMediaPublisher\Services\FacebookService;
+
+// Facebook OAuth
+$redirectUri = route('social-media.facebook.callback');
+$authUrl = FacebookService::getAuthorizationUrl($redirectUri);
+return redirect($authUrl);
+
+// LinkedIn OAuth
+$redirectUri = route('social-media.linkedin.callback');
+$authUrl = LinkedInService::getAuthorizationUrl($redirectUri);
+return redirect($authUrl);
+```
+
+#### 2. OAuth Callbacks (Automatic)
+
+**The package automatically handles OAuth callbacks!** When users authorize your app, they'll be redirected back to your application, and the connection will be automatically saved to the `social_media_connections` table.
+
+The default `OAuthController` handles:
+- Token exchange
+- Connection saving
+- Error handling
+- Redirects with success/error messages
+
+**No additional code needed** - just configure the callback URLs in each platform's developer portal (see below).
+
+#### 3. Disconnect from Platform
+
+```php
+use mantix\LaravelSocialMediaPublisher\Services\FacebookService;
+use mantix\LaravelSocialMediaPublisher\Services\FacebookService;
+
+// Disconnect for a user
+$user = User::find($userId);
+$connection = SocialMediaConnection::forOwner($user)
+    ->where('platform', 'facebook')
+    ->first();
+
+// Or disconnect for a company
+$company = Company::find($companyId);
+$connection = SocialMediaConnection::forOwner($company)
+    ->where('platform', 'facebook')
+    ->first();
+
+if ($connection) {
+    // Revoke access token
+    FacebookService::disconnect($connection->getDecryptedAccessToken());
+    
+    // Delete connection
+    $connection->delete();
+}
+```
 
 ### Unified API
 
@@ -170,43 +374,48 @@ The `SocialMedia` facade provides a unified interface for publishing to multiple
 
 #### Share to Multiple Platforms
 
-```php
-use SocialMedia;
+**Note**: All methods require an owner with OAuth connections. Use `shareForOwner()` instead of `share()`.
 
-// Post to specific platforms
-$result = SocialMedia::share(['facebook', 'twitter', 'linkedin'], 'Content', 'https://example.com');
+```php
+use mantix\LaravelSocialMediaPublisher\Services\FacebookService;
+
+// Post to specific platforms (requires owner with OAuth connections)
+$user = User::find(1);
+$result = SocialMedia::shareForOwner($user, ['facebook', 'twitter', 'linkedin'], 'Content', 'https://example.com');
 
 // Share images to visual platforms
-$result = SocialMedia::shareImage(['instagram', 'pinterest'], 'Caption', 'https://example.com/image.jpg');
+$result = SocialMedia::shareImageForOwner($user, ['instagram', 'pinterest'], 'Caption', 'https://example.com/image.jpg');
 
 // Share videos to video platforms
-$result = SocialMedia::shareVideo(['youtube', 'tiktok'], 'Caption', 'https://example.com/video.mp4');
+$result = SocialMedia::shareVideoForOwner($user, ['youtube', 'tiktok'], 'Caption', 'https://example.com/video.mp4');
 ```
 
 #### Share to All Platforms
 
 ```php
-// Post to all available platforms
-$result = SocialMedia::shareToAll('Content', 'https://example.com');
+// Post to all available platforms (requires owner with OAuth connections)
+$user = User::find(1);
+$result = SocialMedia::shareForOwner($user, SocialMedia::getAvailablePlatforms(), 'Content', 'https://example.com');
 
 // Share images to all platforms
-$result = SocialMedia::shareImageToAll('Caption', 'https://example.com/image.jpg');
+$result = SocialMedia::shareImageForOwner($user, SocialMedia::getAvailablePlatforms(), 'Caption', 'https://example.com/image.jpg');
 
 // Share videos to all platforms
-$result = SocialMedia::shareVideoToAll('Caption', 'https://example.com/video.mp4');
+$result = SocialMedia::shareVideoForOwner($user, SocialMedia::getAvailablePlatforms(), 'Caption', 'https://example.com/video.mp4');
 ```
 
 #### Platform-Specific Access
 
 ```php
-// Access individual platforms
-$facebookService = SocialMedia::facebook();
-$twitterService = SocialMedia::twitter();
-$linkedinService = SocialMedia::linkedin();
+// Access individual platforms (requires owner with OAuth connection)
+$user = User::find(1);
+$facebookService = SocialMedia::platform('facebook', $user);
+$twitterService = SocialMedia::platform('twitter', $user);
+$linkedinService = SocialMedia::platform('linkedin', $user);
 
 // Use platform-specific methods
-$result = SocialMedia::linkedin()->shareToCompanyPage('Content', 'https://example.com');
-$result = SocialMedia::instagram()->shareCarousel('Caption', ['img1.jpg', 'img2.jpg']);
+$result = SocialMedia::platform('linkedin', $user)->shareToCompanyPage('Content', 'https://example.com');
+$result = SocialMedia::platform('instagram', $user)->shareCarousel('Caption', ['img1.jpg', 'img2.jpg']);
 ```
 
 ### Individual Platforms
@@ -216,7 +425,7 @@ Each platform has its own facade with specific methods:
 #### Facebook
 
 ```php
-use FaceBook;
+use mantix\LaravelSocialMediaPublisher\Services\FacebookService;
 
 // Basic publishing
 FaceBook::share('Content', 'https://example.com');
@@ -231,7 +440,7 @@ $pageInfo = FaceBook::getPageInfo();
 #### Twitter/X
 
 ```php
-use Twitter;
+use mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
 
 // Publishing
 Twitter::share('Content', 'https://example.com');
@@ -246,7 +455,7 @@ $userInfo = Twitter::getUserInfo();
 #### LinkedIn
 
 ```php
-use LinkedIn;
+use mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
 
 // Personal posts
 LinkedIn::share('Content', 'https://example.com');
@@ -263,7 +472,7 @@ $userInfo = LinkedIn::getUserInfo();
 #### Instagram
 
 ```php
-use Instagram;
+use mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
 
 // Posts
 Instagram::shareImage('Caption', 'https://example.com/image.jpg');
@@ -283,7 +492,7 @@ $recentMedia = Instagram::getRecentMedia(25);
 #### TikTok
 
 ```php
-use TikTok;
+use Pinterest;
 
 // Video publishing
 TikTok::shareVideo('Caption', 'https://example.com/video.mp4');
@@ -296,7 +505,7 @@ $userVideos = TikTok::getUserVideos(20);
 #### YouTube
 
 ```php
-use YouTube;
+use SocialMedia;
 
 // Video uploads
 YouTube::shareVideo('Title', 'https://example.com/video.mp4');
@@ -313,7 +522,7 @@ $videoAnalytics = YouTube::getVideoAnalytics('video_id');
 #### Pinterest
 
 ```php
-use Pinterest;
+use Telegram;
 
 // Pins
 Pinterest::shareImage('Caption', 'https://example.com/image.jpg');
@@ -332,7 +541,7 @@ $pinAnalytics = Pinterest::getPinAnalytics('pin_id');
 #### Telegram
 
 ```php
-use Telegram;
+use TikTok;
 
 // Messages
 Telegram::share('Content', 'https://example.com');
@@ -406,7 +615,7 @@ $pins = Pinterest::getBoardPins('board_id', 25);
 The package provides comprehensive error handling:
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
+use Twitter;
 
 try {
     $result = SocialMedia::share(['facebook', 'twitter'], 'Content', 'https://example.com');
@@ -428,11 +637,8 @@ try {
 The package automatically retries failed requests with exponential backoff:
 
 ```php
-// Configure retry attempts
-config(['autopost.retry_attempts' => 5]);
-
 // Configure timeout
-config(['autopost.timeout' => 60]);
+config(['social_media_publisher.timeout' => 60]);
 ```
 
 ### Logging
@@ -441,7 +647,7 @@ All operations are automatically logged:
 
 ```php
 // Enable/disable logging
-config(['autopost.enable_logging' => true]);
+config(['social_media_publisher.enable_logging' => true]);
 
 // Check Laravel logs for detailed information
 tail -f storage/logs/laravel.log
@@ -479,8 +685,8 @@ The package validates all inputs:
 ```php
 // In your test setup
 config([
-    'autopost.facebook_access_token' => 'test_token',
-    'autopost.facebook_page_id' => 'test_page_id',
+    'social_media_publisher.facebook_access_token' => 'test_token',
+    'social_media_publisher.facebook_page_id' => 'test_page_id',
     // ... other test configurations
 ]);
 ```
@@ -488,7 +694,7 @@ config([
 ### Mocking APIs
 
 ```php
-use Illuminate\Support\Facades\Http;
+use YouTube;
 
 Http::fake([
     'https://graph.facebook.com/v20.0/*' => Http::response(['id' => '123'], 200),

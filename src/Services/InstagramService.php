@@ -2,11 +2,12 @@
 
 namespace mantix\LaravelSocialMediaPublisher\Services;
 
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use mantix\LaravelSocialMediaPublisher\Contracts\ShareImagePostInterface;
 use mantix\LaravelSocialMediaPublisher\Contracts\ShareInterface;
 use mantix\LaravelSocialMediaPublisher\Contracts\ShareVideoPostInterface;
 use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Class InstagramService
@@ -28,11 +29,6 @@ class InstagramService extends SocialMediaService implements ShareInterface, Sha
     private $instagram_account_id;
 
     /**
-     * @var string Facebook Page ID (required for Instagram Business API)
-     */
-    private $facebook_page_id;
-
-    /**
      * @var InstagramService|null Singleton instance
      */
     private static ?InstagramService $instance = null;
@@ -47,31 +43,311 @@ class InstagramService extends SocialMediaService implements ShareInterface, Sha
      */
     private function __construct(
         string $accessToken,
-        string $instagramAccountId,
-        string $facebookPageId
+        string $instagramAccountId
     ) {
         $this->access_token = $accessToken;
         $this->instagram_account_id = $instagramAccountId;
-        $this->facebook_page_id = $facebookPageId;
     }
 
     /**
-     * Get the singleton instance of InstagramService.
+     * Get instance - OAuth connection required.
+     * 
+     * @return InstagramService
+     * @throws SocialMediaException
+     * @deprecated Use forConnection() with a SocialMediaConnection instead
      */
     public static function getInstance(): InstagramService
     {
-        if (self::$instance === null) {
-            $accessToken = config('autopost.instagram_access_token');
-            $instagramAccountId = config('autopost.instagram_account_id');
-            $facebookPageId = config('autopost.facebook_page_id');
+        throw new SocialMediaException('OAuth connection required. Please use forConnection() with a SocialMediaConnection or authenticate via OAuth first.');
+    }
 
-            if (!$accessToken || !$instagramAccountId || !$facebookPageId) {
-                throw new SocialMediaException('Instagram credentials are not properly configured.');
+    /**
+     * Create a new instance from a SocialMediaConnection.
+     *
+     * @param \mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection
+     * @return InstagramService
+     * @throws SocialMediaException
+     */
+    public static function forConnection(\mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection): InstagramService
+    {
+        if ($connection->platform !== 'instagram') {
+            throw new SocialMediaException('Connection is not for Instagram platform.');
+        }
+
+        $accessToken = $connection->getDecryptedAccessToken();
+        $metadata = $connection->metadata ?? [];
+        $instagramAccountId = $connection->platform_user_id ?? $metadata['instagram_account_id'] ?? null;
+
+        if (!$accessToken || !$instagramAccountId) {
+            throw new SocialMediaException('Instagram connection is missing required credentials.');
+        }
+
+        return new self($accessToken, $instagramAccountId);
+    }
+
+    /**
+     * Get the authorization URL for Instagram OAuth 2.0.
+     * Note: Instagram uses Facebook's OAuth system, so this uses Facebook's authorization URL.
+     *
+     * @param string $redirectUri
+     * @param string|null $state
+     * @param array $scopes
+     * @return string
+     * @throws SocialMediaException
+     */
+    public static function getAuthorizationUrl(string $redirectUri, ?string $state = null, array $scopes = ['instagram_basic', 'instagram_content_publish', 'pages_show_list', 'pages_read_engagement']): string
+    {
+        $clientId = config('social_media_publisher.instagram_client_id') ?? config('social_media_publisher.facebook_client_id');
+        $clientSecret = config('social_media_publisher.instagram_client_secret') ?? config('social_media_publisher.facebook_client_secret');
+
+        if (!$clientId || !$clientSecret) {
+            throw new SocialMediaException('Instagram Client ID and Client Secret must be configured for OAuth.');
+        }
+
+        $state = $state ?? bin2hex(random_bytes(16));
+        $scopeString = implode(',', $scopes);
+
+        $authUrl = sprintf(
+            'https://www.facebook.com/v20.0/dialog/oauth?client_id=%s&redirect_uri=%s&scope=%s&state=%s&response_type=code',
+            urlencode($clientId),
+            urlencode($redirectUri),
+            urlencode($scopeString),
+            urlencode($state)
+        );
+
+        if (config('social_media_publisher.enable_logging', true)) {
+            Log::info('Instagram OAuth authorization URL generated', [
+                'platform' => 'instagram',
+                'redirect_uri' => $redirectUri,
+                'scopes' => $scopes,
+                'state' => $state,
+                'has_client_id' => !empty($clientId),
+            ]);
+        }
+
+        return $authUrl;
+    }
+
+    /**
+     * Handle the OAuth callback and exchange code for access token.
+     * Note: Instagram uses Facebook's OAuth system, so this uses Facebook's token endpoint.
+     *
+     * @param string $code
+     * @param string $redirectUri
+     * @return array
+     * @throws SocialMediaException
+     */
+    public static function handleCallback(string $code, string $redirectUri): array
+    {
+        $enableLogging = config('social_media_publisher.enable_logging', true);
+        
+        if ($enableLogging) {
+            Log::info('Instagram OAuth callback initiated', [
+                'platform' => 'instagram',
+                'redirect_uri' => $redirectUri,
+                'has_code' => !empty($code),
+            ]);
+        }
+
+        $clientId = config('social_media_publisher.instagram_client_id') ?? config('social_media_publisher.facebook_client_id');
+        $clientSecret = config('social_media_publisher.instagram_client_secret') ?? config('social_media_publisher.facebook_client_secret');
+
+        if (!$clientId || !$clientSecret) {
+            if ($enableLogging) {
+                Log::error('Instagram OAuth callback failed: missing credentials', [
+                    'platform' => 'instagram',
+                    'has_client_id' => !empty($clientId),
+                    'has_client_secret' => !empty($clientSecret),
+                ]);
+            }
+            throw new SocialMediaException('Instagram Client ID and Client Secret must be configured for OAuth.');
+        }
+
+        // Exchange code for access token (using Facebook's endpoint)
+        $tokenUrl = 'https://graph.facebook.com/v20.0/oauth/access_token';
+        
+        if ($enableLogging) {
+            Log::debug('Exchanging Instagram OAuth code for access token', [
+                'platform' => 'instagram',
+                'token_url' => $tokenUrl,
+                'redirect_uri' => $redirectUri,
+            ]);
+        }
+        
+        $timeout = config('social_media_publisher.timeout', 30);
+        $response = Http::timeout($timeout)->asForm()->post($tokenUrl, [
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
+            'redirect_uri' => $redirectUri,
+            'code' => $code,
+        ]);
+
+        if (!$response->successful()) {
+            if ($enableLogging) {
+                Log::error('Instagram OAuth token exchange failed', [
+                    'platform' => 'instagram',
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                ]);
+            }
+            throw new SocialMediaException('Failed to exchange code for access token: ' . $response->body());
+        }
+
+        $tokenData = $response->json();
+        $accessToken = $tokenData['access_token'] ?? null;
+        $expiresIn = $tokenData['expires_in'] ?? null;
+
+        if (!$accessToken) {
+            if ($enableLogging) {
+                Log::error('Instagram OAuth callback failed: missing access token', [
+                    'platform' => 'instagram',
+                    'response' => $tokenData,
+                ]);
+            }
+            throw new SocialMediaException('Failed to obtain access token from Instagram OAuth response.');
+        }
+
+        // Get user's Facebook pages (to find connected Instagram accounts)
+        $pages = self::getFacebookPages($accessToken);
+        
+        // Find Instagram Business Account connected to a page
+        $instagramAccount = null;
+        foreach ($pages as $page) {
+            $pageId = $page['id'] ?? null;
+            if ($pageId) {
+                $instagramAccounts = self::getInstagramAccounts($accessToken, $pageId);
+                if (!empty($instagramAccounts)) {
+                    $instagramAccount = $instagramAccounts[0];
+                    break;
+                }
+            }
+        }
+
+        if (!$instagramAccount) {
+            throw new SocialMediaException('No Instagram Business Account found. Please ensure your Facebook Page is connected to an Instagram Business Account.');
+        }
+
+        if ($enableLogging) {
+            Log::info('Instagram OAuth callback completed successfully', [
+                'platform' => 'instagram',
+                'instagram_account_id' => $instagramAccount['id'] ?? null,
+                'instagram_username' => $instagramAccount['username'] ?? null,
+                'expires_in' => $expiresIn,
+            ]);
+        }
+
+        return [
+            'access_token' => $accessToken,
+            'expires_in' => $expiresIn,
+            'token_type' => $tokenData['token_type'] ?? 'bearer',
+            'instagram_account' => $instagramAccount,
+        ];
+    }
+
+    /**
+     * Get Facebook pages for the authenticated user.
+     *
+     * @param string $accessToken
+     * @return array
+     * @throws SocialMediaException
+     */
+    private static function getFacebookPages(string $accessToken): array
+    {
+        $timeout = config('social_media_publisher.timeout', 30);
+        $response = Http::timeout($timeout)
+            ->get('https://graph.facebook.com/v20.0/me/accounts', [
+                'access_token' => $accessToken,
+                'fields' => 'id,name,access_token',
+            ]);
+
+        if (!$response->successful()) {
+            throw new SocialMediaException('Failed to get Facebook pages: ' . $response->body());
+        }
+
+        $data = $response->json();
+        return $data['data'] ?? [];
+    }
+
+    /**
+     * Get Instagram Business Accounts connected to a Facebook Page.
+     *
+     * @param string $accessToken
+     * @param string $pageId
+     * @return array
+     * @throws SocialMediaException
+     */
+    private static function getInstagramAccounts(string $accessToken, string $pageId): array
+    {
+        $timeout = config('social_media_publisher.timeout', 30);
+        $response = Http::timeout($timeout)
+            ->get("https://graph.facebook.com/v20.0/{$pageId}", [
+                'access_token' => $accessToken,
+                'fields' => 'instagram_business_account{id,username}',
+            ]);
+
+        if (!$response->successful()) {
+            throw new SocialMediaException('Failed to get Instagram accounts: ' . $response->body());
+        }
+
+        $data = $response->json();
+        $instagramAccount = $data['instagram_business_account'] ?? null;
+        
+        return $instagramAccount ? [$instagramAccount] : [];
+    }
+
+    /**
+     * Disconnect from Instagram (revoke access token).
+     *
+     * @param string $accessToken
+     * @return bool
+     */
+    public static function disconnect(string $accessToken): bool
+    {
+        $enableLogging = config('social_media_publisher.enable_logging', true);
+        
+        try {
+            // Instagram uses Facebook's revoke endpoint
+            $revokeUrl = 'https://graph.facebook.com/v20.0/me/permissions';
+            
+            if ($enableLogging) {
+                Log::info('Revoking Instagram access token', [
+                    'platform' => 'instagram',
+                ]);
+            }
+            
+            $timeout = config('social_media_publisher.timeout', 30);
+            $response = Http::timeout($timeout)
+                ->delete($revokeUrl, [
+                    'access_token' => $accessToken,
+                ]);
+
+            if ($response->successful()) {
+                if ($enableLogging) {
+                    Log::info('Instagram access token revoked successfully', [
+                        'platform' => 'instagram',
+                    ]);
+                }
+                return true;
             }
 
-            self::$instance = new self($accessToken, $instagramAccountId, $facebookPageId);
+            if ($enableLogging) {
+                Log::error('Failed to revoke Instagram access token', [
+                    'platform' => 'instagram',
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                ]);
+            }
+            return false;
+        } catch (\Exception $e) {
+            if ($enableLogging) {
+                Log::error('Failed to disconnect Instagram', [
+                    'platform' => 'instagram',
+                    'error' => $e->getMessage(),
+                    'exception' => get_class($e),
+                ]);
+            }
+            return false;
         }
-        return self::$instance;
     }
 
     /**
@@ -92,7 +368,11 @@ class InstagramService extends SocialMediaService implements ShareInterface, Sha
             // We'll create a story with the URL
             return $this->shareStory($caption, $url);
         } catch (\Exception $e) {
-            Log::error('Failed to share to Instagram', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to share to Instagram', [
+                'platform' => 'instagram',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+            ]);
             throw new SocialMediaException('Failed to share to Instagram: ' . $e->getMessage());
         }
     }
@@ -129,10 +409,21 @@ class InstagramService extends SocialMediaService implements ShareInterface, Sha
             ];
 
             $response = $this->sendRequest($publishUrl, 'post', $publishParams);
-            Log::info('Instagram image post shared successfully', ['media_id' => $response['id'] ?? null]);
+            $this->log('info', 'Instagram image post shared successfully', [
+                'platform' => 'instagram',
+                'media_id' => $response['id'] ?? null,
+                'instagram_account_id' => $this->instagram_account_id,
+                'caption_length' => strlen($caption),
+            ]);
             return $response;
         } catch (\Exception $e) {
-            Log::error('Failed to share image to Instagram', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to share image to Instagram', [
+                'platform' => 'instagram',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'instagram_account_id' => $this->instagram_account_id,
+                'image_url' => $image_url,
+            ]);
             throw new SocialMediaException('Failed to share image to Instagram: ' . $e->getMessage());
         }
     }
@@ -170,10 +461,21 @@ class InstagramService extends SocialMediaService implements ShareInterface, Sha
             ];
 
             $response = $this->sendRequest($publishUrl, 'post', $publishParams);
-            Log::info('Instagram video post shared successfully', ['media_id' => $response['id'] ?? null]);
+            $this->log('info', 'Instagram video post shared successfully', [
+                'platform' => 'instagram',
+                'media_id' => $response['id'] ?? null,
+                'instagram_account_id' => $this->instagram_account_id,
+                'caption_length' => strlen($caption),
+            ]);
             return $response;
         } catch (\Exception $e) {
-            Log::error('Failed to share video to Instagram', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to share video to Instagram', [
+                'platform' => 'instagram',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'instagram_account_id' => $this->instagram_account_id,
+                'video_url' => $video_url,
+            ]);
             throw new SocialMediaException('Failed to share video to Instagram: ' . $e->getMessage());
         }
     }
@@ -200,10 +502,19 @@ class InstagramService extends SocialMediaService implements ShareInterface, Sha
             ];
 
             $response = $this->sendRequest($storyUrl, 'post', $storyParams);
-            Log::info('Instagram story shared successfully', ['media_id' => $response['id'] ?? null]);
+            $this->log('info', 'Instagram story shared successfully', [
+                'platform' => 'instagram',
+                'media_id' => $response['id'] ?? null,
+                'instagram_account_id' => $this->instagram_account_id,
+            ]);
             return $response;
         } catch (\Exception $e) {
-            Log::error('Failed to share story to Instagram', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to share story to Instagram', [
+                'platform' => 'instagram',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'instagram_account_id' => $this->instagram_account_id,
+            ]);
             throw new SocialMediaException('Failed to share story to Instagram: ' . $e->getMessage());
         }
     }
@@ -258,10 +569,20 @@ class InstagramService extends SocialMediaService implements ShareInterface, Sha
             ];
 
             $response = $this->sendRequest($publishUrl, 'post', $publishParams);
-            Log::info('Instagram carousel post shared successfully', ['media_id' => $response['id'] ?? null]);
+            $this->log('info', 'Instagram carousel post shared successfully', [
+                'platform' => 'instagram',
+                'media_id' => $response['id'] ?? null,
+                'instagram_account_id' => $this->instagram_account_id,
+                'images_count' => count($image_urls),
+            ]);
             return $response;
         } catch (\Exception $e) {
-            Log::error('Failed to share carousel to Instagram', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to share carousel to Instagram', [
+                'platform' => 'instagram',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'instagram_account_id' => $this->instagram_account_id,
+            ]);
             throw new SocialMediaException('Failed to share carousel to Instagram: ' . $e->getMessage());
         }
     }
@@ -283,7 +604,12 @@ class InstagramService extends SocialMediaService implements ShareInterface, Sha
 
             return $this->sendRequest($url, 'get', $params);
         } catch (\Exception $e) {
-            Log::error('Failed to get Instagram account info', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to get Instagram account info', [
+                'platform' => 'instagram',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'instagram_account_id' => $this->instagram_account_id,
+            ]);
             throw new SocialMediaException('Failed to get Instagram account info: ' . $e->getMessage());
         }
     }
@@ -307,7 +633,13 @@ class InstagramService extends SocialMediaService implements ShareInterface, Sha
 
             return $this->sendRequest($url, 'get', $params);
         } catch (\Exception $e) {
-            Log::error('Failed to get Instagram recent media', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to get Instagram recent media', [
+                'platform' => 'instagram',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'instagram_account_id' => $this->instagram_account_id,
+                'limit' => $limit,
+            ]);
             throw new SocialMediaException('Failed to get Instagram recent media: ' . $e->getMessage());
         }
     }

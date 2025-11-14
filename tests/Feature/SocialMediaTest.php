@@ -2,18 +2,18 @@
 
 namespace mantix\LaravelSocialMediaPublisher\Tests\Feature;
 
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
-use mantix\LaravelSocialMediaPublisher\Facades\FaceBook;
-use mantix\LaravelSocialMediaPublisher\Facades\Twitter;
-use mantix\LaravelSocialMediaPublisher\Facades\LinkedIn;
-use mantix\LaravelSocialMediaPublisher\Facades\Instagram;
-use mantix\LaravelSocialMediaPublisher\Facades\TikTok;
-use mantix\LaravelSocialMediaPublisher\Facades\YouTube;
-use mantix\LaravelSocialMediaPublisher\Facades\Pinterest;
-use mantix\LaravelSocialMediaPublisher\Facades\Telegram;
-use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
+use mantix\LaravelSocialMediaPublisher\Facades\FaceBook;
+use mantix\LaravelSocialMediaPublisher\Facades\Instagram;
+use mantix\LaravelSocialMediaPublisher\Facades\LinkedIn;
+use mantix\LaravelSocialMediaPublisher\Facades\Pinterest;
+use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use mantix\LaravelSocialMediaPublisher\Facades\Telegram;
+use mantix\LaravelSocialMediaPublisher\Facades\TikTok;
+use mantix\LaravelSocialMediaPublisher\Facades\Twitter;
+use mantix\LaravelSocialMediaPublisher\Facades\YouTube;
 
 class SocialMediaTest extends TestCase
 {
@@ -23,27 +23,27 @@ class SocialMediaTest extends TestCase
         
         // Set up test configuration
         config([
-            'autopost.facebook_access_token' => 'test_facebook_token',
-            'autopost.facebook_page_id' => 'test_page_id',
-            'autopost.twitter_bearer_token' => 'test_twitter_token',
-            'autopost.twitter_api_key' => 'test_api_key',
-            'autopost.twitter_api_secret' => 'test_api_secret',
-            'autopost.twitter_access_token' => 'test_access_token',
-            'autopost.twitter_access_token_secret' => 'test_access_token_secret',
-            'autopost.linkedin_access_token' => 'test_linkedin_token',
-            'autopost.linkedin_person_urn' => 'test_person_urn',
-            'autopost.instagram_access_token' => 'test_instagram_token',
-            'autopost.instagram_account_id' => 'test_account_id',
-            'autopost.tiktok_access_token' => 'test_tiktok_token',
-            'autopost.tiktok_client_key' => 'test_client_key',
-            'autopost.tiktok_client_secret' => 'test_client_secret',
-            'autopost.youtube_api_key' => 'test_youtube_key',
-            'autopost.youtube_access_token' => 'test_youtube_token',
-            'autopost.youtube_channel_id' => 'test_channel_id',
-            'autopost.pinterest_access_token' => 'test_pinterest_token',
-            'autopost.pinterest_board_id' => 'test_board_id',
-            'autopost.telegram_bot_token' => 'test_telegram_token',
-            'autopost.telegram_chat_id' => 'test_chat_id',
+            'social_media_publisher.facebook_access_token' => 'test_facebook_token',
+            'social_media_publisher.facebook_page_id' => 'test_page_id',
+            'social_media_publisher.twitter_bearer_token' => 'test_twitter_token',
+            'social_media_publisher.twitter_api_key' => 'test_api_key',
+            'social_media_publisher.twitter_api_secret' => 'test_api_secret',
+            'social_media_publisher.twitter_access_token' => 'test_access_token',
+            'social_media_publisher.twitter_access_token_secret' => 'test_access_token_secret',
+            'social_media_publisher.linkedin_access_token' => 'test_linkedin_token',
+            'social_media_publisher.linkedin_person_urn' => 'test_person_urn',
+            'social_media_publisher.instagram_access_token' => 'test_instagram_token',
+            'social_media_publisher.instagram_account_id' => 'test_account_id',
+            'social_media_publisher.tiktok_access_token' => 'test_tiktok_token',
+            'social_media_publisher.tiktok_client_key' => 'test_client_key',
+            'social_media_publisher.tiktok_client_secret' => 'test_client_secret',
+            'social_media_publisher.youtube_api_key' => 'test_youtube_key',
+            'social_media_publisher.youtube_access_token' => 'test_youtube_token',
+            'social_media_publisher.youtube_channel_id' => 'test_channel_id',
+            'social_media_publisher.pinterest_access_token' => 'test_pinterest_token',
+            'social_media_publisher.pinterest_board_id' => 'test_board_id',
+            'social_media_publisher.telegram_bot_token' => 'test_telegram_token',
+            'social_media_publisher.telegram_chat_id' => 'test_chat_id',
         ]);
     }
 
@@ -195,7 +195,7 @@ class SocialMediaTest extends TestCase
 
     public function testLinkedInCompanyPageSharing()
     {
-        config(['autopost.linkedin_organization_urn' => 'test_org_urn']);
+        config(['social_media_publisher.linkedin_organization_urn' => 'test_org_urn']);
         
         Http::fake([
             'https://api.linkedin.com/v2/*' => Http::response(['id' => '789'], 200),

@@ -9,6 +9,33 @@ use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 abstract class SocialMediaService
 {
     /**
+     * Check if logging is enabled.
+     *
+     * @return bool
+     */
+    protected function isLoggingEnabled(): bool
+    {
+        return config('social_media_publisher.enable_logging', true);
+    }
+
+    /**
+     * Log a message if logging is enabled.
+     *
+     * @param string $level The log level (info, warning, error, debug).
+     * @param string $message The log message.
+     * @param array $context Additional context data.
+     * @return void
+     */
+    protected function log(string $level, string $message, array $context = []): void
+    {
+        if (!$this->isLoggingEnabled()) {
+            return;
+        }
+
+        Log::{$level}($message, $context);
+    }
+
+    /**
      * Send HTTP request with error handling and retry logic.
      *
      * @param string $url The request URL.
@@ -20,8 +47,15 @@ abstract class SocialMediaService
      */
     protected function sendRequest(string $url, string $method = 'post', array $params = [], array $headers = []): array
     {
-        $maxRetries = config('autopost.retry_attempts', 3);
-        $timeout = config('autopost.timeout', 30);
+        $maxRetries = config('social_media_publisher.retry_attempts', 3);
+        $timeout = config('social_media_publisher.timeout', 30);
+        
+        $this->log('debug', 'Initiating social media API request', [
+            'url' => $url,
+            'method' => strtoupper($method),
+            'has_params' => !empty($params),
+            'has_headers' => !empty($headers),
+        ]);
         
         for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
             try {
@@ -33,22 +67,24 @@ abstract class SocialMediaService
                     $errorMessage = $this->extractErrorMessage($response);
                     
                     if ($attempt === $maxRetries) {
-                        Log::error('Social media API request failed after all retries', [
+                        $this->log('error', 'Social media API request failed after all retries', [
                             'url' => $url,
-                            'method' => $method,
+                            'method' => strtoupper($method),
                             'status' => $response->status(),
                             'error' => $errorMessage,
-                            'attempts' => $attempt
+                            'attempts' => $attempt,
+                            'response_body' => $response->body(),
                         ]);
                         
                         throw new SocialMediaException("API request failed: {$errorMessage}");
                     }
                     
-                    Log::warning('Social media API request failed, retrying', [
+                    $this->log('warning', 'Social media API request failed, retrying', [
                         'url' => $url,
                         'status' => $response->status(),
                         'error' => $errorMessage,
-                        'attempt' => $attempt
+                        'attempt' => $attempt,
+                        'max_attempts' => $maxRetries,
                     ]);
                     
                     // Wait before retry (exponential backoff)
@@ -58,31 +94,35 @@ abstract class SocialMediaService
 
                 $data = $response->json();
                 
-                Log::info('Social media API request successful', [
+                $this->log('info', 'Social media API request successful', [
                     'url' => $url,
-                    'method' => $method,
+                    'method' => strtoupper($method),
                     'status' => $response->status(),
-                    'attempt' => $attempt
+                    'attempt' => $attempt,
                 ]);
                 
                 return $data;
                 
             } catch (\Exception $e) {
                 if ($attempt === $maxRetries) {
-                    Log::error('Social media API request failed with exception', [
+                    $this->log('error', 'Social media API request failed with exception', [
                         'url' => $url,
-                        'method' => $method,
+                        'method' => strtoupper($method),
                         'error' => $e->getMessage(),
-                        'attempts' => $attempt
+                        'exception' => get_class($e),
+                        'attempts' => $attempt,
+                        'trace' => $e->getTraceAsString(),
                     ]);
                     
                     throw new SocialMediaException("Request failed: " . $e->getMessage());
                 }
                 
-                Log::warning('Social media API request failed with exception, retrying', [
+                $this->log('warning', 'Social media API request failed with exception, retrying', [
                     'url' => $url,
                     'error' => $e->getMessage(),
-                    'attempt' => $attempt
+                    'exception' => get_class($e),
+                    'attempt' => $attempt,
+                    'max_attempts' => $maxRetries,
                 ]);
                 
                 // Wait before retry
@@ -162,7 +202,7 @@ abstract class SocialMediaService
         
         $context = stream_context_create([
             'http' => [
-                'timeout' => config('autopost.timeout', 30),
+                'timeout' => config('social_media_publisher.timeout', 30),
                 'user_agent' => 'Laravel Social Media Publisher Package'
             ]
         ]);

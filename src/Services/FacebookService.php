@@ -2,11 +2,13 @@
 
 namespace mantix\LaravelSocialMediaPublisher\Services;
 
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use mantix\LaravelSocialMediaPublisher\Contracts\ShareImagePostInterface;
 use mantix\LaravelSocialMediaPublisher\Contracts\ShareInterface;
 use mantix\LaravelSocialMediaPublisher\Contracts\ShareVideoPostInterface;
 use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
-use Illuminate\Support\Facades\Log;
+use mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 
 /**
  * Class FacebookService
@@ -47,17 +49,320 @@ class FacebookService extends SocialMediaService implements ShareInterface, Shar
     }
 
     /**
-     * Get the singleton instance of FacebookService.
+     * Get instance - OAuth connection required.
+     * 
+     * This method is deprecated. Use forConnection() instead.
      *
      * @return FacebookService
+     * @throws SocialMediaException
+     * @deprecated Use forConnection() with a SocialMediaConnection instead
      */
     public static function getInstance() {
-        if (self::$instance === null) {
-            $accessToken = config('autopost.facebook_access_token');
-            $pageId = config('autopost.facebook_page_id');
-            self::$instance = new self($accessToken, $pageId);
+        throw new SocialMediaException('OAuth connection required. Please use forConnection() with a SocialMediaConnection or authenticate via OAuth first.');
+    }
+
+    /**
+     * Create a new instance with specific credentials.
+     *
+     * @param string $accessToken
+     * @param string $pageId
+     * @return FacebookService
+     */
+    public static function withCredentials(string $accessToken, string $pageId): FacebookService
+    {
+        return new self($accessToken, $pageId);
+    }
+
+    /**
+     * Create a new instance from a SocialMediaConnection.
+     *
+     * @param SocialMediaConnection $connection
+     * @return FacebookService
+     * @throws SocialMediaException
+     */
+    public static function forConnection(SocialMediaConnection $connection): FacebookService
+    {
+        if ($connection->platform !== 'facebook') {
+            throw new SocialMediaException('Connection is not for Facebook platform.');
         }
-        return self::$instance;
+
+        $accessToken = $connection->getDecryptedAccessToken();
+        $metadata = $connection->metadata ?? [];
+        $pageId = $metadata['page_id'] ?? null;
+
+        if (!$accessToken || !$pageId) {
+            throw new SocialMediaException('Facebook connection is missing required credentials.');
+        }
+
+        return new self($accessToken, $pageId);
+    }
+
+    /**
+     * Get the authorization URL for Facebook OAuth.
+     *
+     * @param string $redirectUri
+     * @param array $scopes
+     * @param string|null $state
+     * @return string
+     * @throws SocialMediaException
+     */
+    public static function getAuthorizationUrl(string $redirectUri, array $scopes = ['pages_manage_posts', 'pages_read_engagement'], ?string $state = null): string
+    {
+        $clientId = config('social_media_publisher.facebook_client_id');
+        $clientSecret = config('social_media_publisher.facebook_client_secret');
+
+        if (!$clientId || !$clientSecret) {
+            throw new SocialMediaException('Facebook Client ID and Client Secret must be configured for OAuth.');
+        }
+
+        $state = $state ?? bin2hex(random_bytes(16));
+        $scopeString = implode(',', $scopes);
+
+        $authUrl = sprintf(
+            'https://www.facebook.com/v20.0/dialog/oauth?client_id=%s&redirect_uri=%s&scope=%s&state=%s&response_type=code',
+            urlencode($clientId),
+            urlencode($redirectUri),
+            urlencode($scopeString),
+            urlencode($state)
+        );
+
+        if (config('social_media_publisher.enable_logging', true)) {
+            Log::info('Facebook OAuth authorization URL generated', [
+                'platform' => 'facebook',
+                'redirect_uri' => $redirectUri,
+                'scopes' => $scopes,
+                'state' => $state,
+                'has_client_id' => !empty($clientId),
+            ]);
+        }
+
+        return $authUrl;
+    }
+
+    /**
+     * Handle the OAuth callback and exchange code for access token.
+     *
+     * @param string $code
+     * @param string $redirectUri
+     * @return array
+     * @throws SocialMediaException
+     */
+    public static function handleCallback(string $code, string $redirectUri): array
+    {
+        $enableLogging = config('social_media_publisher.enable_logging', true);
+        
+        if ($enableLogging) {
+            Log::info('Facebook OAuth callback initiated', [
+                'platform' => 'facebook',
+                'redirect_uri' => $redirectUri,
+                'has_code' => !empty($code),
+            ]);
+        }
+
+        $clientId = config('social_media_publisher.facebook_client_id');
+        $clientSecret = config('social_media_publisher.facebook_client_secret');
+
+        if (!$clientId || !$clientSecret) {
+            if ($enableLogging) {
+                Log::error('Facebook OAuth callback failed: missing credentials', [
+                    'platform' => 'facebook',
+                    'has_client_id' => !empty($clientId),
+                    'has_client_secret' => !empty($clientSecret),
+                ]);
+            }
+            throw new SocialMediaException('Facebook Client ID and Client Secret must be configured for OAuth.');
+        }
+
+        // Exchange code for access token
+        $tokenUrl = 'https://graph.facebook.com/v20.0/oauth/access_token';
+        
+        if ($enableLogging) {
+            Log::debug('Exchanging Facebook OAuth code for access token', [
+                'platform' => 'facebook',
+                'token_url' => $tokenUrl,
+                'redirect_uri' => $redirectUri,
+            ]);
+        }
+        
+        $timeout = config('social_media_publisher.timeout', 30);
+        $response = Http::timeout($timeout)->asForm()->post($tokenUrl, [
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
+            'redirect_uri' => $redirectUri,
+            'code' => $code,
+        ]);
+
+        if (!$response->successful()) {
+            if ($enableLogging) {
+                Log::error('Facebook OAuth token exchange failed', [
+                    'platform' => 'facebook',
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                ]);
+            }
+            throw new SocialMediaException('Failed to exchange code for access token: ' . $response->body());
+        }
+
+        $tokenData = $response->json();
+        $accessToken = $tokenData['access_token'] ?? null;
+
+        if (!$accessToken) {
+            if ($enableLogging) {
+                Log::error('Facebook OAuth access token not found in response', [
+                    'platform' => 'facebook',
+                    'response_keys' => array_keys($tokenData),
+                ]);
+            }
+            throw new SocialMediaException('Access token not found in response.');
+        }
+
+        if ($enableLogging) {
+            Log::info('Facebook OAuth access token obtained', [
+                'platform' => 'facebook',
+                'token_type' => $tokenData['token_type'] ?? 'unknown',
+                'expires_in' => $tokenData['expires_in'] ?? null,
+            ]);
+        }
+
+        // Get long-lived token
+        $longLivedTokenUrl = 'https://graph.facebook.com/v20.0/oauth/access_token';
+        
+        if ($enableLogging) {
+            Log::debug('Requesting Facebook long-lived access token', [
+                'platform' => 'facebook',
+            ]);
+        }
+        
+        $timeout = config('social_media_publisher.timeout', 30);
+        $longLivedResponse = Http::timeout($timeout)->get($longLivedTokenUrl, [
+            'grant_type' => 'fb_exchange_token',
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
+            'fb_exchange_token' => $accessToken,
+        ]);
+
+        if ($longLivedResponse->successful()) {
+            $longLivedData = $longLivedResponse->json();
+            $accessToken = $longLivedData['access_token'] ?? $accessToken;
+            $expiresIn = $longLivedData['expires_in'] ?? null;
+            
+            if ($enableLogging) {
+                Log::info('Facebook long-lived access token obtained', [
+                    'platform' => 'facebook',
+                    'expires_in' => $expiresIn,
+                ]);
+            }
+        } else {
+            if ($enableLogging) {
+                Log::warning('Facebook long-lived token exchange failed, using short-lived token', [
+                    'platform' => 'facebook',
+                    'status' => $longLivedResponse->status(),
+                ]);
+            }
+        }
+
+        // Get user pages
+        $pagesUrl = 'https://graph.facebook.com/v20.0/me/accounts';
+        
+        if ($enableLogging) {
+            Log::debug('Fetching Facebook user pages', [
+                'platform' => 'facebook',
+            ]);
+        }
+        
+        $timeout = config('social_media_publisher.timeout', 30);
+        $pagesResponse = Http::timeout($timeout)->get($pagesUrl, [
+            'access_token' => $accessToken,
+        ]);
+
+        $pages = [];
+        if ($pagesResponse->successful()) {
+            $pagesData = $pagesResponse->json();
+            $pages = $pagesData['data'] ?? [];
+            
+            if ($enableLogging) {
+                Log::info('Facebook user pages retrieved', [
+                    'platform' => 'facebook',
+                    'pages_count' => count($pages),
+                    'page_ids' => array_column($pages, 'id'),
+                ]);
+            }
+        } else {
+            if ($enableLogging) {
+                Log::warning('Failed to retrieve Facebook user pages', [
+                    'platform' => 'facebook',
+                    'status' => $pagesResponse->status(),
+                ]);
+            }
+        }
+
+        if ($enableLogging) {
+            Log::info('Facebook OAuth callback completed successfully', [
+                'platform' => 'facebook',
+                'has_access_token' => !empty($accessToken),
+                'pages_count' => count($pages),
+            ]);
+        }
+
+        return [
+            'access_token' => $accessToken,
+            'expires_in' => $expiresIn ?? null,
+            'token_type' => $tokenData['token_type'] ?? 'bearer',
+            'pages' => $pages,
+        ];
+    }
+
+    /**
+     * Disconnect from Facebook by revoking the access token.
+     *
+     * @param string $accessToken
+     * @return bool
+     */
+    public static function disconnect(string $accessToken): bool
+    {
+        $enableLogging = config('social_media_publisher.enable_logging', true);
+        
+        if ($enableLogging) {
+            Log::info('Facebook OAuth disconnect initiated', [
+                'platform' => 'facebook',
+            ]);
+        }
+        
+        try {
+            $revokeUrl = 'https://graph.facebook.com/v20.0/me/permissions';
+            $timeout = config('social_media_publisher.timeout', 30);
+            $response = Http::timeout($timeout)->delete($revokeUrl, [
+                'access_token' => $accessToken,
+            ]);
+
+            $success = $response->successful();
+            
+            if ($enableLogging) {
+                if ($success) {
+                    Log::info('Facebook OAuth disconnect successful', [
+                        'platform' => 'facebook',
+                        'status' => $response->status(),
+                    ]);
+                } else {
+                    Log::error('Facebook OAuth disconnect failed', [
+                        'platform' => 'facebook',
+                        'status' => $response->status(),
+                        'response' => $response->body(),
+                    ]);
+                }
+            }
+
+            return $success;
+        } catch (\Exception $e) {
+            if ($enableLogging) {
+                Log::error('Facebook OAuth disconnect exception', [
+                    'platform' => 'facebook',
+                    'error' => $e->getMessage(),
+                    'exception' => get_class($e),
+                ]);
+            }
+            return false;
+        }
     }
 
     /**
@@ -82,10 +387,25 @@ class FacebookService extends SocialMediaService implements ShareInterface, Shar
             ]);
 
             $response = $this->sendRequest($url, 'post', $params);
-            Log::info('Facebook image post shared successfully', ['post_id' => $response['id'] ?? null]);
+            if (config('social_media_publisher.enable_logging', true)) {
+                Log::info('Facebook image post shared successfully', [
+                    'platform' => 'facebook',
+                    'post_id' => $response['id'] ?? null,
+                    'page_id' => $this->page_id,
+                    'caption_length' => strlen($caption),
+                ]);
+            }
             return $response;
         } catch (\Exception $e) {
-            Log::error('Failed to share image to Facebook', ['error' => $e->getMessage()]);
+            if (config('social_media_publisher.enable_logging', true)) {
+                Log::error('Failed to share image to Facebook', [
+                    'platform' => 'facebook',
+                    'error' => $e->getMessage(),
+                    'exception' => get_class($e),
+                    'page_id' => $this->page_id,
+                    'image_url' => $image_url,
+                ]);
+            }
             throw new SocialMediaException('Failed to share image to Facebook: ' . $e->getMessage());
         }
     }
@@ -112,10 +432,26 @@ class FacebookService extends SocialMediaService implements ShareInterface, Shar
             ]);
 
             $response = $this->sendRequest($feedUrl, 'post', $params);
-            Log::info('Facebook post shared successfully', ['post_id' => $response['id'] ?? null]);
+            if (config('social_media_publisher.enable_logging', true)) {
+                Log::info('Facebook post shared successfully', [
+                    'platform' => 'facebook',
+                    'post_id' => $response['id'] ?? null,
+                    'page_id' => $this->page_id,
+                    'caption_length' => strlen($caption),
+                    'has_url' => !empty($url),
+                ]);
+            }
             return $response;
         } catch (\Exception $e) {
-            Log::error('Failed to share to Facebook', ['error' => $e->getMessage()]);
+            if (config('social_media_publisher.enable_logging', true)) {
+                Log::error('Failed to share to Facebook', [
+                    'platform' => 'facebook',
+                    'error' => $e->getMessage(),
+                    'exception' => get_class($e),
+                    'page_id' => $this->page_id,
+                    'url' => $url,
+                ]);
+            }
             throw new SocialMediaException('Failed to share to Facebook: ' . $e->getMessage());
         }
     }
@@ -284,7 +620,7 @@ class FacebookService extends SocialMediaService implements ShareInterface, Shar
      * @return string
      */
     private function buildApiUrl(string $endpoint = ''): string {
-        $apiVersion = config('autopost.facebook_api_version');
+        $apiVersion = config('social_media_publisher.facebook_api_version');
         return 'https://graph.facebook.com/' . $apiVersion . '/' . $this->page_id . '/' . $endpoint;
     }
 

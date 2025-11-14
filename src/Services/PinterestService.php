@@ -49,21 +49,39 @@ class PinterestService extends SocialMediaService implements ShareInterface, Sha
     }
 
     /**
-     * Get the singleton instance of PinterestService.
+     * Get instance - OAuth connection required.
+     * 
+     * @return PinterestService
+     * @throws SocialMediaException
+     * @deprecated Use forConnection() with a SocialMediaConnection instead
      */
     public static function getInstance(): PinterestService
     {
-        if (self::$instance === null) {
-            $accessToken = config('autopost.pinterest_access_token');
-            $boardId = config('autopost.pinterest_board_id');
+        throw new SocialMediaException('OAuth connection required. Please use forConnection() with a SocialMediaConnection or authenticate via OAuth first.');
+    }
 
-            if (!$accessToken || !$boardId) {
-                throw new SocialMediaException('Pinterest credentials are not properly configured.');
-            }
-
-            self::$instance = new self($accessToken, $boardId);
+    /**
+     * Create a new instance from a SocialMediaConnection.
+     *
+     * @param \mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection
+     * @return PinterestService
+     * @throws SocialMediaException
+     */
+    public static function forConnection(\mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection): PinterestService
+    {
+        if ($connection->platform !== 'pinterest') {
+            throw new SocialMediaException('Connection is not for Pinterest platform.');
         }
-        return self::$instance;
+
+        $accessToken = $connection->getDecryptedAccessToken();
+        $metadata = $connection->metadata ?? [];
+        $boardId = $metadata['board_id'] ?? null;
+
+        if (!$accessToken || !$boardId) {
+            throw new SocialMediaException('Pinterest connection is missing required credentials.');
+        }
+
+        return new self($accessToken, $boardId);
     }
 
     /**
@@ -84,7 +102,12 @@ class PinterestService extends SocialMediaService implements ShareInterface, Sha
             // We'll create a pin with the URL as the link
             return $this->createPin($caption, $url, 'link');
         } catch (\Exception $e) {
-            Log::error('Failed to share to Pinterest', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to share to Pinterest', [
+                'platform' => 'pinterest',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'url' => $url,
+            ]);
             throw new SocialMediaException('Failed to share to Pinterest: ' . $e->getMessage());
         }
     }
@@ -104,7 +127,12 @@ class PinterestService extends SocialMediaService implements ShareInterface, Sha
         try {
             return $this->createPin($caption, $image_url, 'image');
         } catch (\Exception $e) {
-            Log::error('Failed to share image to Pinterest', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to share image to Pinterest', [
+                'platform' => 'pinterest',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'image_url' => $image_url,
+            ]);
             throw new SocialMediaException('Failed to share image to Pinterest: ' . $e->getMessage());
         }
     }
@@ -124,7 +152,12 @@ class PinterestService extends SocialMediaService implements ShareInterface, Sha
         try {
             return $this->createPin($caption, $video_url, 'video');
         } catch (\Exception $e) {
-            Log::error('Failed to share video to Pinterest', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to share video to Pinterest', [
+                'platform' => 'pinterest',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'video_url' => $video_url,
+            ]);
             throw new SocialMediaException('Failed to share video to Pinterest: ' . $e->getMessage());
         }
     }
@@ -158,10 +191,19 @@ class PinterestService extends SocialMediaService implements ShareInterface, Sha
             }
 
             $response = $this->sendRequest($url, 'post', $params);
-            Log::info('Pinterest pin created successfully', ['pin_id' => $response['id'] ?? null]);
+            $this->log('info', 'Pinterest pin created successfully', [
+                'platform' => 'pinterest',
+                'pin_id' => $response['id'] ?? null,
+                'board_id' => $this->board_id,
+            ]);
             return $response;
         } catch (\Exception $e) {
-            Log::error('Failed to create Pinterest pin', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to create Pinterest pin', [
+                'platform' => 'pinterest',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'board_id' => $this->board_id,
+            ]);
             throw new SocialMediaException('Failed to create Pinterest pin: ' . $e->getMessage());
         }
     }
@@ -186,10 +228,19 @@ class PinterestService extends SocialMediaService implements ShareInterface, Sha
             ];
 
             $response = $this->sendRequest($url, 'post', $params);
-            Log::info('Pinterest board created successfully', ['board_id' => $response['id'] ?? null]);
+            $this->log('info', 'Pinterest board created successfully', [
+                'platform' => 'pinterest',
+                'board_id' => $response['id'] ?? null,
+                'board_name' => $name,
+            ]);
             return $response;
         } catch (\Exception $e) {
-            Log::error('Failed to create Pinterest board', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to create Pinterest board', [
+                'platform' => 'pinterest',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'board_name' => $name,
+            ]);
             throw new SocialMediaException('Failed to create Pinterest board: ' . $e->getMessage());
         }
     }
@@ -211,7 +262,12 @@ class PinterestService extends SocialMediaService implements ShareInterface, Sha
 
             return $this->sendRequest($url, 'get', $params);
         } catch (\Exception $e) {
-            Log::error('Failed to get Pinterest boards', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to get Pinterest boards', [
+                'platform' => 'pinterest',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'limit' => $limit,
+            ]);
             throw new SocialMediaException('Failed to get Pinterest boards: ' . $e->getMessage());
         }
     }
@@ -234,7 +290,13 @@ class PinterestService extends SocialMediaService implements ShareInterface, Sha
 
             return $this->sendRequest($url, 'get', $params);
         } catch (\Exception $e) {
-            Log::error('Failed to get Pinterest board pins', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to get Pinterest board pins', [
+                'platform' => 'pinterest',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'board_id' => $boardId,
+                'limit' => $limit,
+            ]);
             throw new SocialMediaException('Failed to get Pinterest board pins: ' . $e->getMessage());
         }
     }
@@ -255,7 +317,11 @@ class PinterestService extends SocialMediaService implements ShareInterface, Sha
 
             return $this->sendRequest($url, 'get', $params);
         } catch (\Exception $e) {
-            Log::error('Failed to get Pinterest user info', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to get Pinterest user info', [
+                'platform' => 'pinterest',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+            ]);
             throw new SocialMediaException('Failed to get Pinterest user info: ' . $e->getMessage());
         }
     }
@@ -279,7 +345,12 @@ class PinterestService extends SocialMediaService implements ShareInterface, Sha
 
             return $this->sendRequest($url, 'get', $params);
         } catch (\Exception $e) {
-            Log::error('Failed to get Pinterest pin analytics', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to get Pinterest pin analytics', [
+                'platform' => 'pinterest',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'pin_id' => $pinId,
+            ]);
             throw new SocialMediaException('Failed to get Pinterest pin analytics: ' . $e->getMessage());
         }
     }
@@ -303,7 +374,12 @@ class PinterestService extends SocialMediaService implements ShareInterface, Sha
 
             return $this->sendRequest($url, 'get', $params);
         } catch (\Exception $e) {
-            Log::error('Failed to search Pinterest pins', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to search Pinterest pins', [
+                'platform' => 'pinterest',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'query' => $query,
+            ]);
             throw new SocialMediaException('Failed to search Pinterest pins: ' . $e->getMessage());
         }
     }

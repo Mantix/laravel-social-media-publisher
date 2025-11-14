@@ -15,8 +15,8 @@ class InstagramServiceTest extends TestCase
         parent::setUp();
         
         config([
-            'autopost.instagram_access_token' => 'test_instagram_token',
-            'autopost.instagram_account_id' => 'test_account_id',
+            'social_media_publisher.instagram_access_token' => 'test_instagram_token',
+            'social_media_publisher.instagram_account_id' => 'test_account_id',
         ]);
     }
 
@@ -30,7 +30,7 @@ class InstagramServiceTest extends TestCase
 
     public function testInstagramServiceWithMissingCredentials()
     {
-        config(['autopost.instagram_access_token' => null]);
+        config(['social_media_publisher.instagram_access_token' => null]);
         
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('Instagram API credentials are not fully configured');
@@ -335,7 +335,7 @@ class InstagramServiceTest extends TestCase
 
     public function testTimeoutConfiguration()
     {
-        config(['autopost.timeout' => 60]);
+        config(['social_media_publisher.timeout' => 60]);
 
         Http::fake([
             'https://graph.facebook.com/v20.0/test_account_id/media' => Http::response(['id' => 'media123'], 200),

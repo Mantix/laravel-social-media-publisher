@@ -51,8 +51,8 @@ class TelegramService extends SocialMediaService implements ShareInterface,
      */
     public static function getInstance(): TelegramService {
         if (self::$instance === null) {
-            $telegramBotToken = config('autopost.telegram_bot_token');
-            $chatId = config('autopost.telegram_chat_id');
+            $telegramBotToken = config('social_media_publisher.telegram_bot_token');
+            $chatId = config('social_media_publisher.telegram_chat_id');
             self::$instance = new self($telegramBotToken, $chatId);
         }
         return self::$instance;
@@ -81,10 +81,20 @@ class TelegramService extends SocialMediaService implements ShareInterface,
             ];
 
             $response = $this->sendRequest($sendMessageUrl, 'post', $params);
-            Log::info('Telegram message sent successfully', ['message_id' => $response['result']['message_id'] ?? null]);
+            $this->log('info', 'Telegram message sent successfully', [
+                'platform' => 'telegram',
+                'message_id' => $response['result']['message_id'] ?? null,
+                'chat_id' => $this->chat_id,
+                'caption_length' => strlen($caption),
+            ]);
             return $response;
         } catch (\Exception $e) {
-            Log::error('Failed to send Telegram message', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to send Telegram message', [
+                'platform' => 'telegram',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'chat_id' => $this->chat_id,
+            ]);
             throw new SocialMediaException('Failed to send Telegram message: ' . $e->getMessage());
         }
     }
@@ -171,7 +181,7 @@ class TelegramService extends SocialMediaService implements ShareInterface,
      * @return string
      */
     private function buildApiUrl(string $endpoint): string {
-        $baseUrl = config('autopost.telegram_api_base_url');
+        $baseUrl = config('social_media_publisher.telegram_api_base_url');
         return $baseUrl . $this->telegram_bot_token . '/' . $endpoint;
     }
 }

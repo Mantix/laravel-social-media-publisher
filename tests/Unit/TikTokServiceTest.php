@@ -15,9 +15,9 @@ class TikTokServiceTest extends TestCase
         parent::setUp();
         
         config([
-            'autopost.tiktok_access_token' => 'test_tiktok_token',
-            'autopost.tiktok_client_key' => 'test_client_key',
-            'autopost.tiktok_client_secret' => 'test_client_secret',
+            'social_media_publisher.tiktok_access_token' => 'test_tiktok_token',
+            'social_media_publisher.tiktok_client_key' => 'test_client_key',
+            'social_media_publisher.tiktok_client_secret' => 'test_client_secret',
         ]);
     }
 
@@ -31,7 +31,7 @@ class TikTokServiceTest extends TestCase
 
     public function testTikTokServiceWithMissingCredentials()
     {
-        config(['autopost.tiktok_access_token' => null]);
+        config(['social_media_publisher.tiktok_access_token' => null]);
         
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('TikTok API credentials are not fully configured');
@@ -225,7 +225,7 @@ class TikTokServiceTest extends TestCase
 
     public function testTimeoutConfiguration()
     {
-        config(['autopost.timeout' => 60]);
+        config(['social_media_publisher.timeout' => 60]);
 
         Http::fake([
             'https://open-api.tiktok.com/share/video/upload/' => Http::response([

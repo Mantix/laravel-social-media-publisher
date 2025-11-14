@@ -56,22 +56,40 @@ class TikTokService extends SocialMediaService implements ShareInterface, ShareI
     }
 
     /**
-     * Get the singleton instance of TikTokService.
+     * Get instance - OAuth connection required.
+     * 
+     * @return TikTokService
+     * @throws SocialMediaException
+     * @deprecated Use forConnection() with a SocialMediaConnection instead
      */
     public static function getInstance(): TikTokService
     {
-        if (self::$instance === null) {
-            $accessToken = config('autopost.tiktok_access_token');
-            $clientKey = config('autopost.tiktok_client_key');
-            $clientSecret = config('autopost.tiktok_client_secret');
+        throw new SocialMediaException('OAuth connection required. Please use forConnection() with a SocialMediaConnection or authenticate via OAuth first.');
+    }
 
-            if (!$accessToken || !$clientKey || !$clientSecret) {
-                throw new SocialMediaException('TikTok credentials are not properly configured.');
-            }
-
-            self::$instance = new self($accessToken, $clientKey, $clientSecret);
+    /**
+     * Create a new instance from a SocialMediaConnection.
+     *
+     * @param \mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection
+     * @return TikTokService
+     * @throws SocialMediaException
+     */
+    public static function forConnection(\mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection): TikTokService
+    {
+        if ($connection->platform !== 'tiktok') {
+            throw new SocialMediaException('Connection is not for TikTok platform.');
         }
-        return self::$instance;
+
+        $accessToken = $connection->getDecryptedAccessToken();
+        $metadata = $connection->metadata ?? [];
+        $clientKey = $metadata['client_key'] ?? config('social_media_publisher.tiktok_client_id');
+        $clientSecret = $metadata['client_secret'] ?? config('social_media_publisher.tiktok_client_secret');
+
+        if (!$accessToken || !$clientKey || !$clientSecret) {
+            throw new SocialMediaException('TikTok connection is missing required credentials.');
+        }
+
+        return new self($accessToken, $clientKey, $clientSecret);
     }
 
     /**
@@ -93,7 +111,12 @@ class TikTokService extends SocialMediaService implements ShareInterface, ShareI
             $videoUrl = $this->createTextVideo($caption, $url);
             return $this->shareVideo($caption, $videoUrl);
         } catch (\Exception $e) {
-            Log::error('Failed to share to TikTok', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to share to TikTok', [
+                'platform' => 'tiktok',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'url' => $url,
+            ]);
             throw new SocialMediaException('Failed to share to TikTok: ' . $e->getMessage());
         }
     }
@@ -116,7 +139,12 @@ class TikTokService extends SocialMediaService implements ShareInterface, ShareI
             $videoUrl = $this->convertImageToVideo($image_url, $caption);
             return $this->shareVideo($caption, $videoUrl);
         } catch (\Exception $e) {
-            Log::error('Failed to share image to TikTok', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to share image to TikTok', [
+                'platform' => 'tiktok',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'image_url' => $image_url,
+            ]);
             throw new SocialMediaException('Failed to share image to TikTok: ' . $e->getMessage());
         }
     }
@@ -174,10 +202,19 @@ class TikTokService extends SocialMediaService implements ShareInterface, ShareI
             ];
 
             $response = $this->sendRequest($publishUrl, 'post', $publishParams);
-            Log::info('TikTok video post shared successfully', ['video_id' => $response['data']['video_id'] ?? null]);
+            $this->log('info', 'TikTok video post shared successfully', [
+                'platform' => 'tiktok',
+                'video_id' => $response['data']['video_id'] ?? null,
+                'caption_length' => strlen($caption),
+            ]);
             return $response;
         } catch (\Exception $e) {
-            Log::error('Failed to share video to TikTok', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to share video to TikTok', [
+                'platform' => 'tiktok',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'video_url' => $video_url,
+            ]);
             throw new SocialMediaException('Failed to share video to TikTok: ' . $e->getMessage());
         }
     }
@@ -198,7 +235,11 @@ class TikTokService extends SocialMediaService implements ShareInterface, ShareI
 
             return $this->sendRequest($url, 'get', $params);
         } catch (\Exception $e) {
-            Log::error('Failed to get TikTok user info', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to get TikTok user info', [
+                'platform' => 'tiktok',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+            ]);
             throw new SocialMediaException('Failed to get TikTok user info: ' . $e->getMessage());
         }
     }
@@ -221,7 +262,12 @@ class TikTokService extends SocialMediaService implements ShareInterface, ShareI
 
             return $this->sendRequest($url, 'get', $params);
         } catch (\Exception $e) {
-            Log::error('Failed to get TikTok user videos', ['error' => $e->getMessage()]);
+            $this->log('error', 'Failed to get TikTok user videos', [
+                'platform' => 'tiktok',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'limit' => $limit,
+            ]);
             throw new SocialMediaException('Failed to get TikTok user videos: ' . $e->getMessage());
         }
     }

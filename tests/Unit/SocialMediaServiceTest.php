@@ -197,7 +197,7 @@ class SocialMediaServiceTest extends TestCase
 
     public function testTimeoutConfiguration()
     {
-        config(['autopost.timeout' => 60]);
+        config(['social_media_publisher.timeout' => 60]);
 
         Http::fake([
             'https://api.example.com/test' => Http::response(['success' => true], 200),
@@ -212,7 +212,7 @@ class SocialMediaServiceTest extends TestCase
 
     public function testRetryAttemptsConfiguration()
     {
-        config(['autopost.retry_attempts' => 5]);
+        config(['social_media_publisher.retry_attempts' => 5]);
 
         Http::fake([
             'https://api.example.com/test' => Http::response(['error' => 'Server error'], 500),

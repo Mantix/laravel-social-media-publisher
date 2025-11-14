@@ -15,9 +15,9 @@ class YouTubeServiceTest extends TestCase
         parent::setUp();
         
         config([
-            'autopost.youtube_api_key' => 'test_youtube_key',
-            'autopost.youtube_access_token' => 'test_youtube_token',
-            'autopost.youtube_channel_id' => 'test_channel_id',
+            'social_media_publisher.youtube_api_key' => 'test_youtube_key',
+            'social_media_publisher.youtube_access_token' => 'test_youtube_token',
+            'social_media_publisher.youtube_channel_id' => 'test_channel_id',
         ]);
     }
 
@@ -31,7 +31,7 @@ class YouTubeServiceTest extends TestCase
 
     public function testYouTubeServiceWithMissingCredentials()
     {
-        config(['autopost.youtube_api_key' => null]);
+        config(['social_media_publisher.youtube_api_key' => null]);
         
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('YouTube API credentials are not fully configured');
@@ -314,7 +314,7 @@ class YouTubeServiceTest extends TestCase
 
     public function testTimeoutConfiguration()
     {
-        config(['autopost.timeout' => 60]);
+        config(['social_media_publisher.timeout' => 60]);
 
         Http::fake([
             'https://www.googleapis.com/youtube/v3/videos' => Http::response(['id' => 'youtube123'], 200),

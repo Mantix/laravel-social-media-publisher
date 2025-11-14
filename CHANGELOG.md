@@ -5,6 +5,95 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2025-11-13
+
+### 🚀 Major Release - Multi-User Support & OAuth Integration
+
+**⚠️ BREAKING CHANGES**: This is a breaking release. The package now requires OAuth 2.0 authentication for all platforms (except Telegram which uses Bot API). All connections must be established through OAuth flows.
+
+This major release adds comprehensive multi-user support with polymorphic relationships, allowing any model (User, Company, etc.) to connect their own social media accounts and post on their behalf.
+
+### ✨ Added
+
+#### Multi-User & Multi-Entity Support
+- **SocialMediaConnection Model**: New Eloquent model with polymorphic relationships for managing social media connections
+- **Polymorphic Ownership**: Connections can belong to any model (User, Company, etc.) using `owner_id` and `owner_type`
+- **Database Migration**: Migration for storing connections, tokens, and metadata with polymorphic support
+- **Owner-Specific Services**: Services can now be instantiated with owner-specific credentials
+- **Connection Management**: Methods to create, retrieve, and delete connections for any model type
+
+#### OAuth Integration
+- **Facebook OAuth**: Complete OAuth 2.0 flow with `getAuthorizationUrl()` and `handleCallback()` methods
+- **LinkedIn OAuth**: OAuth 2.0 integration for LinkedIn personal and company pages
+- **Twitter OAuth**: OAuth 1.0a support (requires signature implementation)
+- **Disconnect Methods**: Ability to revoke access tokens and disconnect from platforms
+
+#### Enhanced Services
+- **withCredentials()**: Static method to create service instances with specific credentials
+- **forConnection()**: Static method to create service instances from SocialMediaConnection models
+- **OAuth-Only Authentication**: All platforms (except Telegram) require OAuth 2.0 authentication. No `.env` credential fallbacks.
+
+#### SocialMediaManager Updates
+- **shareForOwner()**: Post to multiple platforms on behalf of any owner (User, Company, etc.)
+- **shareImageForOwner()**: Share images on behalf of any owner
+- **shareVideoForOwner()**: Share videos on behalf of any owner
+- **platform()**: Enhanced to accept optional owner (model instance or class name)
+- **Removed**: `shareForUser()`, `shareImageForUser()`, `shareVideoForUser()` methods removed (use `shareForOwner()` instead)
+
+#### Configuration
+- **OAuth Credentials**: Added Facebook App ID/Secret, LinkedIn Client ID/Secret, Twitter Client ID/Secret
+- **Migration Publishing**: New tag for publishing database migrations
+
+### 🔧 Enhanced
+
+- **Service Provider**: Updated to publish migrations alongside configuration
+- **Token Encryption**: All access tokens and secrets are encrypted in the database
+- **Connection Scopes**: Query scopes for filtering connections by owner (polymorphic), platform, and status
+- **Polymorphic Relationships**: Full support for any model type owning social media connections
+
+### 📦 Database Changes
+
+New `social_media_connections` table with:
+- Polymorphic ownership (`owner_id` and `owner_type`) - supports User, Company, or any model
+- Platform and connection type
+- Encrypted access tokens and refresh tokens
+- Token expiration tracking
+- Metadata JSON field for platform-specific data
+- Active/inactive status
+
+### 🔄 Migration Guide
+
+#### From v1.0.0 to v2.0.0
+
+**⚠️ BREAKING CHANGES**: This release requires code updates if you're using multi-user features.
+
+1. **Publish and Run Migrations**:
+   ```bash
+   php artisan vendor:publish --provider="mantix\LaravelSocialMediaPublisher\SocialShareServiceProvider" --tag=social-media-publisher-migrations
+   php artisan migrate
+   ```
+
+2. **Add OAuth Credentials** (required for multi-user):
+   ```env
+   FACEBOOK_APP_ID=your_app_id
+   FACEBOOK_APP_SECRET=your_app_secret
+   LINKEDIN_CLIENT_ID=your_client_id
+   LINKEDIN_CLIENT_SECRET=your_client_secret
+   ```
+
+3. **Update Code** (required for multi-user):
+   - Replace `shareForUser()` with `shareForOwner()`
+   - Replace `shareImageForUser()` with `shareImageForOwner()`
+   - Replace `shareVideoForUser()` with `shareVideoForOwner()`
+   - Update connection creation to use `owner_id` and `owner_type` instead of `user_id`
+   - Replace `SocialMediaConnection::forUser()` with `SocialMediaConnection::forOwner()`
+   - Update `SocialMedia::platform()` calls to pass model instances instead of user IDs
+
+4. **OAuth Required**:
+   - All platforms (except Telegram) now require OAuth 2.0 authentication
+   - Users must authenticate their accounts through OAuth before posting
+   - No `.env` credential fallbacks - OAuth is the only supported method
+
 ## [1.0.0] - 2025-11-13
 
 ### 🚀 Major Release - Complete Social Media Platform Support
@@ -71,7 +160,7 @@ This is a major release that transforms the package from a basic Facebook/Telegr
 
 ```
 src/
-├── config/autopost.php              # Complete configuration
+├── config/social-media-publisher.php              # Complete configuration
 ├── Contracts/                       # Interface definitions
 ├── Enums/FacebookMetrics.php         # Facebook analytics enums
 ├── Exceptions/SocialMediaException.php # Custom exception

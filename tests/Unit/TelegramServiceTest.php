@@ -15,8 +15,8 @@ class TelegramServiceTest extends TestCase
         parent::setUp();
         
         config([
-            'autopost.telegram_bot_token' => 'test_telegram_token',
-            'autopost.telegram_chat_id' => 'test_chat_id',
+            'social_media_publisher.telegram_bot_token' => 'test_telegram_token',
+            'social_media_publisher.telegram_chat_id' => 'test_chat_id',
         ]);
     }
 
@@ -30,7 +30,7 @@ class TelegramServiceTest extends TestCase
 
     public function testTelegramServiceWithMissingCredentials()
     {
-        config(['autopost.telegram_bot_token' => null]);
+        config(['social_media_publisher.telegram_bot_token' => null]);
         
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('Telegram API credentials are not fully configured');
@@ -327,7 +327,7 @@ class TelegramServiceTest extends TestCase
 
     public function testTimeoutConfiguration()
     {
-        config(['autopost.timeout' => 60]);
+        config(['social_media_publisher.timeout' => 60]);
 
         Http::fake([
             'https://api.telegram.org/bot*' => Http::response([

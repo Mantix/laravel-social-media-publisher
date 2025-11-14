@@ -1,6 +1,6 @@
 {
     "name": "mantix/laravel-social-media-publisher",
-    "description": "Laravel social media auto post package - Complete solution for publishing to 8 major social media platforms",
+    "description": "Laravel social media auto post package - Complete solution for publishing to 8 major social media platforms with multi-user support and OAuth integration",
     "type": "library",
     "require": {
         "laravel/framework": "^12.0"
