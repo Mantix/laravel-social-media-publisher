@@ -10,13 +10,11 @@ use mantix\LaravelSocialMediaPublisher\Services\SocialMediaManager;
  *
  * Unified facade for publishing to multiple social media platforms simultaneously.
  *
- * @method static array share(array $platforms, string $caption, string $url)
- * @method static array shareImage(array $platforms, string $caption, string $image_url)
- * @method static array shareVideo(array $platforms, string $caption, string $video_url)
- * @method static array shareToAll(string $caption, string $url)
- * @method static array shareImageToAll(string $caption, string $image_url)
- * @method static array shareVideoToAll(string $caption, string $video_url)
- * @method static SocialMediaManager platform(string $platform)
+ * @method static array shareText($owner, array $platforms, string $caption, ?int $ownerId = null)
+ * @method static array shareUrl($owner, array $platforms, string $caption, string $url, ?int $ownerId = null)
+ * @method static array shareImage($owner, array $platforms, string $caption, string $image_url, ?int $ownerId = null)
+ * @method static array shareVideo($owner, array $platforms, string $caption, string $video_url, ?int $ownerId = null)
+ * @method static SocialMediaManager platform(string $platform, $owner = null, ?int $ownerId = null, ?string $connectionType = 'profile')
  * @method static SocialMediaManager facebook()
  * @method static SocialMediaManager twitter()
  * @method static SocialMediaManager linkedin()

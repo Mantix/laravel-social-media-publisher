@@ -101,7 +101,7 @@ class TikTokService extends SocialMediaService implements ShareInterface, ShareI
      * @return array Response from the TikTok API.
      * @throws SocialMediaException
      */
-    public function share(string $caption, string $url): array
+    public function shareUrl(string $caption, string $url): array
     {
         $this->validateInput($caption, $url);
         

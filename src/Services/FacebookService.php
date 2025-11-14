@@ -419,7 +419,7 @@ class FacebookService extends SocialMediaService implements ShareInterface, Shar
      * @return array Response from the Facebook API.
      * @throws SocialMediaException
      */
-    public function share(string $caption, string $url): array
+    public function shareUrl(string $caption, string $url): array
     {
         $this->validateText($caption, 2000);
         $this->validateUrl($url);
@@ -453,6 +453,46 @@ class FacebookService extends SocialMediaService implements ShareInterface, Shar
                 ]);
             }
             throw new SocialMediaException('Failed to share to Facebook: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Share a text-only post to Facebook (without URL or image).
+     *
+     * @param string $caption The text content of the post.
+     * @return array Response from the Facebook API.
+     * @throws SocialMediaException
+     */
+    public function shareText(string $caption): array
+    {
+        $this->validateText($caption, 2000);
+        
+        try {
+            $feedUrl = $this->buildApiUrl('feed');
+            $params = $this->buildParams([
+                'message' => $caption,
+            ]);
+
+            $response = $this->sendRequest($feedUrl, 'post', $params);
+            if (config('social_media_publisher.enable_logging', true)) {
+                Log::info('Facebook text-only post shared successfully', [
+                    'platform' => 'facebook',
+                    'post_id' => $response['id'] ?? null,
+                    'page_id' => $this->page_id,
+                    'caption_length' => strlen($caption),
+                ]);
+            }
+            return $response;
+        } catch (\Exception $e) {
+            if (config('social_media_publisher.enable_logging', true)) {
+                Log::error('Failed to share text-only post to Facebook', [
+                    'platform' => 'facebook',
+                    'error' => $e->getMessage(),
+                    'exception' => get_class($e),
+                    'page_id' => $this->page_id,
+                ]);
+            }
+            throw new SocialMediaException('Failed to share text-only post to Facebook: ' . $e->getMessage());
         }
     }
 

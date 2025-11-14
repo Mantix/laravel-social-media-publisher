@@ -93,7 +93,7 @@ class PinterestService extends SocialMediaService implements ShareInterface, Sha
      * @return array Response from the Pinterest API.
      * @throws SocialMediaException
      */
-    public function share(string $caption, string $url): array
+    public function shareUrl(string $caption, string $url): array
     {
         $this->validateInput($caption, $url);
         

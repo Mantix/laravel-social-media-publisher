@@ -101,7 +101,7 @@ class YouTubeService extends SocialMediaService implements ShareInterface, Share
      * @return array Response from the YouTube API.
      * @throws SocialMediaException
      */
-    public function share(string $caption, string $url): array
+    public function shareUrl(string $caption, string $url): array
     {
         $this->validateInput($caption, $url);
         

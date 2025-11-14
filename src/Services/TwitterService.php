@@ -406,7 +406,7 @@ class TwitterService extends SocialMediaService implements ShareInterface, Share
      * @return array Response from the Twitter API.
      * @throws SocialMediaException
      */
-    public function share(string $caption, string $url): array
+    public function shareUrl(string $caption, string $url): array
     {
         $this->validateInput($caption, $url);
         
@@ -437,6 +437,46 @@ class TwitterService extends SocialMediaService implements ShareInterface, Share
                 'url' => $url,
             ]);
             throw new SocialMediaException('Failed to share to Twitter: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Share a text-only tweet to Twitter (without URL or image).
+     *
+     * @param string $caption The text content of the tweet.
+     * @return array Response from the Twitter API.
+     * @throws SocialMediaException
+     */
+    public function shareText(string $caption): array
+    {
+        if (empty(trim($caption))) {
+            throw new SocialMediaException('Caption cannot be empty.');
+        }
+        
+        if (strlen($caption) > 280) {
+            throw new SocialMediaException('Tweet text exceeds 280 character limit.');
+        }
+
+        $url = $this->buildApiUrl('tweets');
+        $params = [
+            'text' => $caption
+        ];
+
+        try {
+            $response = $this->sendRequest($url, 'post', $params);
+            $this->log('info', 'Twitter text-only tweet shared successfully', [
+                'platform' => 'twitter',
+                'tweet_id' => $response['data']['id'] ?? null,
+                'caption_length' => strlen($caption),
+            ]);
+            return $response;
+        } catch (\Exception $e) {
+            $this->log('error', 'Failed to share text-only tweet to Twitter', [
+                'platform' => 'twitter',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+            ]);
+            throw new SocialMediaException('Failed to share text-only tweet to Twitter: ' . $e->getMessage());
         }
     }
 

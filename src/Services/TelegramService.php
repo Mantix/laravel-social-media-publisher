@@ -67,7 +67,7 @@ class TelegramService extends SocialMediaService implements ShareInterface,
      * @return array Response from the Telegram API.
      * @throws SocialMediaException
      */
-    public function share(string $caption, string $url): array
+    public function shareUrl(string $caption, string $url): array
     {
         $this->validateText($caption, 4096);
         $this->validateUrl($url);
@@ -96,6 +96,44 @@ class TelegramService extends SocialMediaService implements ShareInterface,
                 'chat_id' => $this->chat_id,
             ]);
             throw new SocialMediaException('Failed to send Telegram message: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Share a text-only message to Telegram (without URL or image).
+     *
+     * @param string $caption The text content of the message.
+     * @return array Response from the Telegram API.
+     * @throws SocialMediaException
+     */
+    public function shareText(string $caption): array
+    {
+        $this->validateText($caption, 4096);
+        
+        try {
+            $sendMessageUrl = $this->buildApiUrl('sendMessage');
+            $params = [
+                'chat_id'    => $this->chat_id,
+                'text'       => $caption,
+                'parse_mode' => 'Markdown',
+            ];
+
+            $response = $this->sendRequest($sendMessageUrl, 'post', $params);
+            $this->log('info', 'Telegram text-only message sent successfully', [
+                'platform' => 'telegram',
+                'message_id' => $response['result']['message_id'] ?? null,
+                'chat_id' => $this->chat_id,
+                'caption_length' => strlen($caption),
+            ]);
+            return $response;
+        } catch (\Exception $e) {
+            $this->log('error', 'Failed to send text-only Telegram message', [
+                'platform' => 'telegram',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'chat_id' => $this->chat_id,
+            ]);
+            throw new SocialMediaException('Failed to send text-only Telegram message: ' . $e->getMessage());
         }
     }
 

@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2] - 2025-11-14
+
+### 🔄 Changed
+
+#### Method Renaming for API Clarity
+- **BREAKING**: Renamed `share()` to `shareUrl()` in all service classes and interfaces
+  - Updated `ShareInterface` to use `shareUrl()` method signature
+  - Updated all platform services (LinkedIn, Facebook, Twitter, Telegram, Instagram, Pinterest, TikTok, YouTube)
+  - Updated all facade docblocks to reflect new method names
+- **BREAKING**: Removed "ForOwner" suffix from all `SocialMediaManager` methods since owners are always required
+  - `shareTextForOwner()` → `shareText()`
+  - `shareUrlForOwner()` → `shareUrl()`
+  - `shareImageForOwner()` → `shareImage()`
+  - `shareVideoForOwner()` → `shareVideo()`
+
+### ❌ Removed
+
+- **BREAKING**: Removed deprecated methods from `SocialMediaManager`:
+  - `shareUrl()` (old version without owner) - Use `shareUrl($owner, ...)` instead
+  - `shareImage()` (old version without owner) - Use `shareImage($owner, ...)` instead
+  - `shareVideo()` (old version without owner) - Use `shareVideo($owner, ...)` instead
+  - `shareUrlToAll()` - Use `shareUrl()` with all platforms instead
+  - `shareImageToAll()` - Use `shareImage()` with all platforms instead
+  - `shareVideoToAll()` - Use `shareVideo()` with all platforms instead
+
+### ✨ Added
+
+- Added `shareText()` method to `SocialMediaManager` for text-only posts (owners always required)
+- Added `shareText()` method to FacebookService, TwitterService, TelegramService, and LinkedInService for text-only posts
+- Updated LinkedInService `shareUrl()` method to support organization_urn
+
+### 📝 Documentation
+
+- Updated RELEASE_NOTES.md with v2.0.2 migration guide
+- Updated all facade docblocks with new method signatures
+- Clarified that all methods now require owner authentication
+
+### 🔧 Technical Details
+
+This change improves API clarity and enforces OAuth authentication by:
+- Making it explicit that all sharing methods require an owner: `shareText()`, `shareUrl()`, `shareImage()`, `shareVideo()`
+- Removing methods that don't require owners (which would fail anyway in v2.0.0+)
+- Removing "ForOwner" suffix since owners are always required, resulting in cleaner method names
+
+**Migration Required**: All code using deprecated methods must be updated:
+- `share()` → `shareUrl()` (on service level)
+- `shareForOwner()` / `shareUrlForOwner()` → `shareUrl($owner, ...)` (on manager level)
+- `shareToAll()` → `shareUrl($owner, ...)` with all platforms
+- Add `shareText($owner, ...)` for text-only posts
+
 ## [2.0.0] - 2025-11-13
 
 ### 🚀 Major Release - Multi-User Support & OAuth Integration

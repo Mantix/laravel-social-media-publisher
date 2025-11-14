@@ -247,13 +247,18 @@ use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 
 // Post to multiple platforms (requires OAuth connections)
 $user = User::find(1);
-$result = SocialMedia::shareForOwner($user, ['facebook', 'twitter', 'linkedin'], 'Hello World!', 'https://example.com');
+
+// Text-only posts
+$result = SocialMedia::shareText($user, ['facebook', 'twitter'], 'Hello World!');
+
+// Posts with URL
+$result = SocialMedia::shareUrl($user, ['facebook', 'twitter', 'linkedin'], 'Hello World!', 'https://example.com');
 
 // Share images
-$result = SocialMedia::shareImageForOwner($user, ['instagram', 'pinterest'], 'Check this out!', 'https://example.com/image.jpg');
+$result = SocialMedia::shareImage($user, ['instagram', 'pinterest'], 'Check this out!', 'https://example.com/image.jpg');
 
 // Share videos
-$result = SocialMedia::shareVideoForOwner($user, ['youtube', 'tiktok'], 'Watch this!', 'https://example.com/video.mp4');
+$result = SocialMedia::shareVideo($user, ['youtube', 'tiktok'], 'Watch this!', 'https://example.com/video.mp4');
 ```
 
 ### Multi-User & Multi-Entity Support
@@ -262,49 +267,50 @@ The package supports polymorphic relationships, allowing any model (User, Compan
 
 ```php
 use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
-use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 // Post on behalf of a User
 $user = User::find(1);
-$result = SocialMedia::shareForOwner($user, ['facebook', 'twitter'], 'Hello World!', 'https://example.com');
+$result = SocialMedia::shareUrl($user, ['facebook', 'twitter'], 'Hello World!', 'https://example.com');
 
 // Post on behalf of a Company
 $company = Company::find(1);
-$result = SocialMedia::shareForOwner($company, ['facebook', 'linkedin'], 'Company Update!', 'https://example.com');
+$result = SocialMedia::shareUrl($company, ['facebook', 'linkedin'], 'Company Update!', 'https://example.com');
 
 // Get owner-specific platform service
 $facebookService = SocialMedia::platform('facebook', $user);
-$facebookService->share('Hello', 'https://example.com');
+$facebookService->shareUrl('Hello', 'https://example.com');
 
 // Or using class name and ID
-$result = SocialMedia::shareForOwner(Company::class, ['facebook'], 'Update', 'https://example.com', $companyId);
+$result = SocialMedia::shareUrl(Company::class, ['facebook'], 'Update', 'https://example.com', $companyId);
 ```
 
 **Note**: All posting requires OAuth 2.0 connections. Users must authenticate their social media accounts through OAuth before posting. OAuth is the only supported authentication method (except Telegram which uses Bot API).
 
 ### Individual Platform Access
 
-**Note**: All platform facades require OAuth connections. Use `SocialMedia::platform()` with an owner instead.
+**Note**: All platform services require OAuth connections. Use `SocialMedia::platform()` with an owner to get a service instance.
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
-use mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
+use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 // Get platform service for a user with OAuth connection
 $user = User::find(1);
 
 // Facebook
 $facebookService = SocialMedia::platform('facebook', $user);
-$facebookService->share('Hello Facebook!', 'https://example.com');
+$facebookService->shareText('Hello Facebook!');
+$facebookService->shareUrl('Hello Facebook!', 'https://example.com');
 $facebookService->shareImage('Check this image!', 'https://example.com/image.jpg');
 
 // Twitter
 $twitterService = SocialMedia::platform('twitter', $user);
-$twitterService->share('Hello Twitter!', 'https://example.com');
+$twitterService->shareText('Hello Twitter!');
+$twitterService->shareUrl('Hello Twitter!', 'https://example.com');
 
 // LinkedIn
 $linkedinService = SocialMedia::platform('linkedin', $user);
-$linkedinService->share('Hello LinkedIn!', 'https://example.com');
+$linkedinService->shareText('Hello LinkedIn!');
+$linkedinService->shareUrl('Hello LinkedIn!', 'https://example.com');
 $linkedinService->shareToCompanyPage('Company update!', 'https://example.com');
 ```
 
@@ -374,20 +380,25 @@ The `SocialMedia` facade provides a unified interface for publishing to multiple
 
 #### Share to Multiple Platforms
 
-**Note**: All methods require an owner with OAuth connections. Use `shareForOwner()` instead of `share()`.
+**Note**: All methods require an owner with OAuth connections. The owner is always the first parameter.
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Services\FacebookService;
+use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
 // Post to specific platforms (requires owner with OAuth connections)
 $user = User::find(1);
-$result = SocialMedia::shareForOwner($user, ['facebook', 'twitter', 'linkedin'], 'Content', 'https://example.com');
+
+// Text-only posts
+$result = SocialMedia::shareText($user, ['facebook', 'twitter'], 'Hello World!');
+
+// Posts with URL
+$result = SocialMedia::shareUrl($user, ['facebook', 'twitter', 'linkedin'], 'Content', 'https://example.com');
 
 // Share images to visual platforms
-$result = SocialMedia::shareImageForOwner($user, ['instagram', 'pinterest'], 'Caption', 'https://example.com/image.jpg');
+$result = SocialMedia::shareImage($user, ['instagram', 'pinterest'], 'Caption', 'https://example.com/image.jpg');
 
 // Share videos to video platforms
-$result = SocialMedia::shareVideoForOwner($user, ['youtube', 'tiktok'], 'Caption', 'https://example.com/video.mp4');
+$result = SocialMedia::shareVideo($user, ['youtube', 'tiktok'], 'Caption', 'https://example.com/video.mp4');
 ```
 
 #### Share to All Platforms
@@ -395,13 +406,19 @@ $result = SocialMedia::shareVideoForOwner($user, ['youtube', 'tiktok'], 'Caption
 ```php
 // Post to all available platforms (requires owner with OAuth connections)
 $user = User::find(1);
-$result = SocialMedia::shareForOwner($user, SocialMedia::getAvailablePlatforms(), 'Content', 'https://example.com');
+$allPlatforms = SocialMedia::getAvailablePlatforms();
+
+// Text-only posts to all platforms
+$result = SocialMedia::shareText($user, $allPlatforms, 'Hello World!');
+
+// Posts with URL to all platforms
+$result = SocialMedia::shareUrl($user, $allPlatforms, 'Content', 'https://example.com');
 
 // Share images to all platforms
-$result = SocialMedia::shareImageForOwner($user, SocialMedia::getAvailablePlatforms(), 'Caption', 'https://example.com/image.jpg');
+$result = SocialMedia::shareImage($user, $allPlatforms, 'Caption', 'https://example.com/image.jpg');
 
 // Share videos to all platforms
-$result = SocialMedia::shareVideoForOwner($user, SocialMedia::getAvailablePlatforms(), 'Caption', 'https://example.com/video.mp4');
+$result = SocialMedia::shareVideo($user, $allPlatforms, 'Caption', 'https://example.com/video.mp4');
 ```
 
 #### Platform-Specific Access
@@ -416,141 +433,181 @@ $linkedinService = SocialMedia::platform('linkedin', $user);
 // Use platform-specific methods
 $result = SocialMedia::platform('linkedin', $user)->shareToCompanyPage('Content', 'https://example.com');
 $result = SocialMedia::platform('instagram', $user)->shareCarousel('Caption', ['img1.jpg', 'img2.jpg']);
+$result = SocialMedia::platform('facebook', $user)->shareText('Text-only post!');
 ```
 
 ### Individual Platforms
 
-Each platform has its own facade with specific methods:
+**Note**: All platform services require OAuth connections. Use `SocialMedia::platform($platform, $owner)` to get a service instance for a specific owner.
+
+Each platform service provides specific methods:
 
 #### Facebook
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Services\FacebookService;
+use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+
+// Get service for a user (requires OAuth connection)
+$user = User::find(1);
+$facebook = SocialMedia::platform('facebook', $user);
 
 // Basic publishing
-FaceBook::share('Content', 'https://example.com');
-FaceBook::shareImage('Caption', 'https://example.com/image.jpg');
-FaceBook::shareVideo('Caption', 'https://example.com/video.mp4');
+$facebook->shareText('Text-only post!');
+$facebook->shareUrl('Content', 'https://example.com');
+$facebook->shareImage('Caption', 'https://example.com/image.jpg');
+$facebook->shareVideo('Caption', 'https://example.com/video.mp4');
 
 // Analytics
-$insights = FaceBook::getPageInsights(['page_impressions', 'page_engaged_users']);
-$pageInfo = FaceBook::getPageInfo();
+$insights = $facebook->getPageInsights(['page_impressions', 'page_engaged_users']);
+$pageInfo = $facebook->getPageInfo();
 ```
 
 #### Twitter/X
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
+use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+
+// Get service for a user (requires OAuth connection)
+$user = User::find(1);
+$twitter = SocialMedia::platform('twitter', $user);
 
 // Publishing
-Twitter::share('Content', 'https://example.com');
-Twitter::shareImage('Caption', 'https://example.com/image.jpg');
-Twitter::shareVideo('Caption', 'https://example.com/video.mp4');
+$twitter->shareText('Text-only tweet!');
+$twitter->shareUrl('Content', 'https://example.com');
+$twitter->shareImage('Caption', 'https://example.com/image.jpg');
+$twitter->shareVideo('Caption', 'https://example.com/video.mp4');
 
 // Analytics
-$timeline = Twitter::getTimeline(10);
-$userInfo = Twitter::getUserInfo();
+$timeline = $twitter->getTimeline(10);
+$userInfo = $twitter->getUserInfo();
 ```
 
 #### LinkedIn
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
+use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+
+// Get service for a user (requires OAuth connection)
+$user = User::find(1);
+$linkedin = SocialMedia::platform('linkedin', $user);
 
 // Personal posts
-LinkedIn::share('Content', 'https://example.com');
-LinkedIn::shareImage('Caption', 'https://example.com/image.jpg');
-LinkedIn::shareVideo('Caption', 'https://example.com/video.mp4');
+$linkedin->shareText('Text-only post!');
+$linkedin->shareUrl('Content', 'https://example.com');
+$linkedin->shareImage('Caption', 'https://example.com/image.jpg');
+$linkedin->shareVideo('Caption', 'https://example.com/video.mp4');
 
 // Company page posts
-LinkedIn::shareToCompanyPage('Content', 'https://example.com');
+$linkedin->shareToCompanyPage('Content', 'https://example.com');
 
 // User info
-$userInfo = LinkedIn::getUserInfo();
+$userInfo = $linkedin->getUserInfo();
 ```
 
 #### Instagram
 
 ```php
-use mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
+use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+
+// Get service for a user (requires OAuth connection)
+$user = User::find(1);
+$instagram = SocialMedia::platform('instagram', $user);
 
 // Posts
-Instagram::shareImage('Caption', 'https://example.com/image.jpg');
-Instagram::shareVideo('Caption', 'https://example.com/video.mp4');
+$instagram->shareImage('Caption', 'https://example.com/image.jpg');
+$instagram->shareVideo('Caption', 'https://example.com/video.mp4');
 
 // Carousel posts
-Instagram::shareCarousel('Caption', ['img1.jpg', 'img2.jpg', 'img3.jpg']);
+$instagram->shareCarousel('Caption', ['img1.jpg', 'img2.jpg', 'img3.jpg']);
 
 // Stories
-Instagram::shareStory('Caption', 'https://example.com');
+$instagram->shareStory('Caption', 'https://example.com');
 
 // Analytics
-$accountInfo = Instagram::getAccountInfo();
-$recentMedia = Instagram::getRecentMedia(25);
+$accountInfo = $instagram->getAccountInfo();
+$recentMedia = $instagram->getRecentMedia(25);
 ```
 
 #### TikTok
 
 ```php
-use Pinterest;
+use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+
+// Get service for a user (requires OAuth connection)
+$user = User::find(1);
+$tiktok = SocialMedia::platform('tiktok', $user);
 
 // Video publishing
-TikTok::shareVideo('Caption', 'https://example.com/video.mp4');
+$tiktok->shareVideo('Caption', 'https://example.com/video.mp4');
 
 // Analytics
-$userInfo = TikTok::getUserInfo();
-$userVideos = TikTok::getUserVideos(20);
+$userInfo = $tiktok->getUserInfo();
+$userVideos = $tiktok->getUserVideos(20);
 ```
 
 #### YouTube
 
 ```php
-use SocialMedia;
+use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+
+// Get service for a user (requires OAuth connection)
+$user = User::find(1);
+$youtube = SocialMedia::platform('youtube', $user);
 
 // Video uploads
-YouTube::shareVideo('Title', 'https://example.com/video.mp4');
+$youtube->shareVideo('Title', 'https://example.com/video.mp4');
 
 // Community posts
-YouTube::createCommunityPost('Content', 'https://example.com');
+$youtube->createCommunityPost('Content', 'https://example.com');
 
 // Analytics
-$channelInfo = YouTube::getChannelInfo();
-$channelVideos = YouTube::getChannelVideos(25);
-$videoAnalytics = YouTube::getVideoAnalytics('video_id');
+$channelInfo = $youtube->getChannelInfo();
+$channelVideos = $youtube->getChannelVideos(25);
+$videoAnalytics = $youtube->getVideoAnalytics('video_id');
 ```
 
 #### Pinterest
 
 ```php
-use Telegram;
+use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+
+// Get service for a user (requires OAuth connection)
+$user = User::find(1);
+$pinterest = SocialMedia::platform('pinterest', $user);
 
 // Pins
-Pinterest::shareImage('Caption', 'https://example.com/image.jpg');
-Pinterest::shareVideo('Caption', 'https://example.com/video.mp4');
+$pinterest->shareUrl('Caption', 'https://example.com');
+$pinterest->shareImage('Caption', 'https://example.com/image.jpg');
+$pinterest->shareVideo('Caption', 'https://example.com/video.mp4');
 
 // Boards
-Pinterest::createBoard('Board Name', 'Description');
+$pinterest->createBoard('Board Name', 'Description');
 
 // Analytics
-$userInfo = Pinterest::getUserInfo();
-$boards = Pinterest::getBoards(25);
-$boardPins = Pinterest::getBoardPins('board_id', 25);
-$pinAnalytics = Pinterest::getPinAnalytics('pin_id');
+$userInfo = $pinterest->getUserInfo();
+$boards = $pinterest->getBoards(25);
+$boardPins = $pinterest->getBoardPins('board_id', 25);
+$pinAnalytics = $pinterest->getPinAnalytics('pin_id');
 ```
 
 #### Telegram
 
 ```php
-use TikTok;
+use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+
+// Get service for a user (requires OAuth connection)
+$user = User::find(1);
+$telegram = SocialMedia::platform('telegram', $user);
 
 // Messages
-Telegram::share('Content', 'https://example.com');
-Telegram::shareImage('Caption', 'https://example.com/image.jpg');
-Telegram::shareVideo('Caption', 'https://example.com/video.mp4');
-Telegram::shareDocument('Caption', 'https://example.com/document.pdf');
+$telegram->shareText('Text-only message!');
+$telegram->shareUrl('Content', 'https://example.com');
+$telegram->shareImage('Caption', 'https://example.com/image.jpg');
+$telegram->shareVideo('Caption', 'https://example.com/video.mp4');
+$telegram->shareDocument('Caption', 'https://example.com/document.pdf');
 
 // Bot updates
-$updates = Telegram::getUpdates();
+$updates = $telegram->getUpdates();
 ```
 
 ### Platform-Specific Features
@@ -558,15 +615,20 @@ $updates = Telegram::getUpdates();
 #### Facebook Analytics
 
 ```php
+use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+
+$user = User::find(1);
+$facebook = SocialMedia::platform('facebook', $user);
+
 // Get page insights
-$insights = FaceBook::getPageInsights([
+$insights = $facebook->getPageInsights([
     'page_impressions',
     'page_engaged_users',
     'page_fan_adds'
 ]);
 
 // Get insights for specific date range
-$insights = FaceBook::getPageInsights(
+$insights = $facebook->getPageInsights(
     ['page_impressions', 'page_engaged_users'],
     ['since' => '2024-01-01', 'until' => '2024-01-31']
 );
@@ -575,37 +637,57 @@ $insights = FaceBook::getPageInsights(
 #### Instagram Carousels
 
 ```php
+use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+
+$user = User::find(1);
+$instagram = SocialMedia::platform('instagram', $user);
+
 // Create carousel with multiple images
 $images = [
     'https://example.com/image1.jpg',
     'https://example.com/image2.jpg',
     'https://example.com/image3.jpg'
 ];
-$result = Instagram::shareCarousel('Check out our products!', $images);
+$result = $instagram->shareCarousel('Check out our products!', $images);
 ```
 
 #### LinkedIn Company Pages
 
 ```php
+use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+
+$user = User::find(1);
+$linkedin = SocialMedia::platform('linkedin', $user);
+
 // Post to company page (requires organization URN)
-LinkedIn::shareToCompanyPage('Company update: We\'re hiring!', 'https://example.com/careers');
+$linkedin->shareToCompanyPage('Company update: We\'re hiring!', 'https://example.com/careers');
 ```
 
 #### YouTube Community Posts
 
 ```php
+use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+
+$user = User::find(1);
+$youtube = SocialMedia::platform('youtube', $user);
+
 // Create community post
-YouTube::createCommunityPost('What would you like to see in our next video?', 'https://example.com/poll');
+$youtube->createCommunityPost('What would you like to see in our next video?', 'https://example.com/poll');
 ```
 
 #### Pinterest Boards
 
 ```php
+use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+
+$user = User::find(1);
+$pinterest = SocialMedia::platform('pinterest', $user);
+
 // Create board
-Pinterest::createBoard('My Recipes', 'Collection of amazing recipes', 'PUBLIC');
+$pinterest->createBoard('My Recipes', 'Collection of amazing recipes', 'PUBLIC');
 
 // Get board pins
-$pins = Pinterest::getBoardPins('board_id', 25);
+$pins = $pinterest->getBoardPins('board_id', 25);
 ```
 
 ## 🔧 Advanced Features
@@ -615,10 +697,12 @@ $pins = Pinterest::getBoardPins('board_id', 25);
 The package provides comprehensive error handling:
 
 ```php
-use Twitter;
+use mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 
 try {
-    $result = SocialMedia::share(['facebook', 'twitter'], 'Content', 'https://example.com');
+    $user = User::find(1);
+    $result = SocialMedia::shareUrl($user, ['facebook', 'twitter'], 'Content', 'https://example.com');
     
     // Check results
     if ($result['error_count'] > 0) {
@@ -694,7 +778,7 @@ config([
 ### Mocking APIs
 
 ```php
-use YouTube;
+use Illuminate\Support\Facades\Http;
 
 Http::fake([
     'https://graph.facebook.com/v20.0/*' => Http::response(['id' => '123'], 200),
@@ -731,21 +815,12 @@ php examples/platform-specific/instagram-examples.php
 
 | Method | Description | Parameters |
 |--------|-------------|------------|
-| `share($platforms, $caption, $url)` | Share to multiple platforms | `array $platforms, string $caption, string $url` |
-| `shareImage($platforms, $caption, $image_url)` | Share image to multiple platforms | `array $platforms, string $caption, string $image_url` |
-| `shareVideo($platforms, $caption, $video_url)` | Share video to multiple platforms | `array $platforms, string $caption, string $video_url` |
-| `shareToAll($caption, $url)` | Share to all platforms | `string $caption, string $url` |
-| `shareImageToAll($caption, $image_url)` | Share image to all platforms | `string $caption, string $image_url` |
-| `shareVideoToAll($caption, $video_url)` | Share video to all platforms | `string $caption, string $video_url` |
-| `platform($platform)` | Get platform service | `string $platform` |
-| `facebook()` | Get Facebook service | - |
-| `twitter()` | Get Twitter service | - |
-| `linkedin()` | Get LinkedIn service | - |
-| `instagram()` | Get Instagram service | - |
-| `tiktok()` | Get TikTok service | - |
-| `youtube()` | Get YouTube service | - |
-| `pinterest()` | Get Pinterest service | - |
-| `telegram()` | Get Telegram service | - |
+| `shareText($owner, $platforms, $caption, $ownerId = null)` | Share text-only content to multiple platforms | `mixed $owner, array $platforms, string $caption, ?int $ownerId` |
+| `shareUrl($owner, $platforms, $caption, $url, $ownerId = null)` | Share content with URL to multiple platforms | `mixed $owner, array $platforms, string $caption, string $url, ?int $ownerId` |
+| `shareImage($owner, $platforms, $caption, $image_url, $ownerId = null)` | Share image to multiple platforms | `mixed $owner, array $platforms, string $caption, string $image_url, ?int $ownerId` |
+| `shareVideo($owner, $platforms, $caption, $video_url, $ownerId = null)` | Share video to multiple platforms | `mixed $owner, array $platforms, string $caption, string $video_url, ?int $ownerId` |
+| `platform($platform, $owner = null, $ownerId = null, $connectionType = 'profile')` | Get platform service for owner | `string $platform, mixed $owner, ?int $ownerId, ?string $connectionType` |
+| `getAvailablePlatforms()` | Get list of available platforms | - |
 
 ### Platform Facades
 

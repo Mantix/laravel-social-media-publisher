@@ -321,14 +321,17 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
      * @return array Response from the LinkedIn API.
      * @throws SocialMediaException
      */
-    public function share(string $caption, string $url): array
+    public function shareUrl(string $caption, string $url): array
     {
         $this->validateInput($caption, $url);
         
         try {
+            // Use organization_urn if available, otherwise fall back to person_urn
+            $author = $this->organization_urn ?? $this->person_urn;
+            
             $url_endpoint = $this->buildApiUrl('ugcPosts');
             $params = [
-                'author' => $this->person_urn,
+                'author' => $author,
                 'lifecycleState' => 'PUBLISHED',
                 'specificContent' => [
                     'com.linkedin.ugc.ShareContent' => [
@@ -359,6 +362,8 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
             $this->log('info', 'LinkedIn post shared successfully', [
                 'platform' => 'linkedin',
                 'post_id' => $response['id'] ?? null,
+                'author' => $author,
+                'organization_urn' => $this->organization_urn,
                 'person_urn' => $this->person_urn,
                 'caption_length' => strlen($caption),
             ]);
@@ -371,6 +376,60 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
                 'url' => $url,
             ]);
             throw new SocialMediaException('Failed to share to LinkedIn: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Share a text-only post to LinkedIn (without URL or image).
+     *
+     * @param string $caption The text content of the post.
+     * @return array Response from the LinkedIn API.
+     * @throws SocialMediaException
+     */
+    public function shareText(string $caption): array
+    {
+        if (empty(trim($caption))) {
+            throw new SocialMediaException('Caption cannot be empty.');
+        }
+        
+        try {
+            // Use organization_urn if available, otherwise fall back to person_urn
+            $author = $this->organization_urn ?? $this->person_urn;
+            
+            $url = $this->buildApiUrl('ugcPosts');
+            $params = [
+                'author' => $author,
+                'lifecycleState' => 'PUBLISHED',
+                'specificContent' => [
+                    'com.linkedin.ugc.ShareContent' => [
+                        'shareCommentary' => [
+                            'text' => $caption
+                        ],
+                        'shareMediaCategory' => 'NONE',
+                    ]
+                ],
+                'visibility' => [
+                    'com.linkedin.ugc.MemberNetworkVisibility' => 'PUBLIC'
+                ]
+            ];
+
+            $response = $this->sendRequest($url, 'post', $params);
+            $this->log('info', 'LinkedIn text-only post shared successfully', [
+                'platform' => 'linkedin',
+                'post_id' => $response['id'] ?? null,
+                'author' => $author,
+                'organization_urn' => $this->organization_urn,
+                'person_urn' => $this->person_urn,
+                'caption_length' => strlen($caption),
+            ]);
+            return $response;
+        } catch (\Exception $e) {
+            $this->log('error', 'Failed to share text-only post to LinkedIn', [
+                'platform' => 'linkedin',
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+            ]);
+            throw new SocialMediaException('Failed to share text-only post to LinkedIn: ' . $e->getMessage());
         }
     }
 

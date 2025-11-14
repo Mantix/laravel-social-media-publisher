@@ -4,6 +4,6 @@ namespace Mantix\LaravelSocialMediaPublisher\Contracts;
 
 interface ShareInterface {
 
-    public function share(string $caption, string $url): array;
+    public function shareUrl(string $caption, string $url): array;
 
 }

@@ -28,80 +28,6 @@ class SocialMediaManager
         'telegram' => TelegramService::class,
     ];
 
-    /**
-     * Share content to multiple platforms.
-     *
-     * @param array $platforms Array of platform names.
-     * @param string $caption The caption text.
-     * @param string $url The URL to share.
-     * @return array Results from all platforms.
-     */
-    public function share(array $platforms, string $caption, string $url): array
-    {
-        return $this->executeOnPlatforms($platforms, 'share', [$caption, $url]);
-    }
-
-    /**
-     * Share image to multiple platforms.
-     *
-     * @param array $platforms Array of platform names.
-     * @param string $caption The caption text.
-     * @param string $image_url The image URL.
-     * @return array Results from all platforms.
-     */
-    public function shareImage(array $platforms, string $caption, string $image_url): array
-    {
-        return $this->executeOnPlatforms($platforms, 'shareImage', [$caption, $image_url]);
-    }
-
-    /**
-     * Share video to multiple platforms.
-     *
-     * @param array $platforms Array of platform names.
-     * @param string $caption The caption text.
-     * @param string $video_url The video URL.
-     * @return array Results from all platforms.
-     */
-    public function shareVideo(array $platforms, string $caption, string $video_url): array
-    {
-        return $this->executeOnPlatforms($platforms, 'shareVideo', [$caption, $video_url]);
-    }
-
-    /**
-     * Share content to all available platforms.
-     *
-     * @param string $caption The caption text.
-     * @param string $url The URL to share.
-     * @return array Results from all platforms.
-     */
-    public function shareToAll(string $caption, string $url): array
-    {
-        return $this->share(array_keys(self::PLATFORMS), $caption, $url);
-    }
-
-    /**
-     * Share image to all available platforms.
-     *
-     * @param string $caption The caption text.
-     * @param string $image_url The image URL.
-     * @return array Results from all platforms.
-     */
-    public function shareImageToAll(string $caption, string $image_url): array
-    {
-        return $this->shareImage(array_keys(self::PLATFORMS), $caption, $image_url);
-    }
-
-    /**
-     * Share video to all available platforms.
-     *
-     * @param string $caption The caption text.
-     * @param string $video_url The video URL.
-     * @return array Results from all platforms.
-     */
-    public function shareVideoToAll(string $caption, string $video_url): array
-    {
-        return $this->shareVideo(array_keys(self::PLATFORMS), $caption, $video_url);
-    }
 
     /**
      * Get a specific platform service.
@@ -293,7 +219,21 @@ class SocialMediaManager
     }
 
     /**
-     * Share content to multiple platforms for a specific owner (polymorphic).
+     * Share text-only content to multiple platforms for a specific owner (polymorphic).
+     *
+     * @param mixed $owner Model instance or class name.
+     * @param array $platforms Array of platform names.
+     * @param string $caption The caption text.
+     * @param int|null $ownerId Optional owner ID if passing class name.
+     * @return array Results from all platforms.
+     */
+    public function shareText($owner, array $platforms, string $caption, ?int $ownerId = null): array
+    {
+        return $this->executeOnPlatforms($platforms, 'shareText', [$caption], $owner, $ownerId);
+    }
+
+    /**
+     * Share content with URL to multiple platforms for a specific owner (polymorphic).
      *
      * @param mixed $owner Model instance or class name.
      * @param array $platforms Array of platform names.
@@ -302,9 +242,9 @@ class SocialMediaManager
      * @param int|null $ownerId Optional owner ID if passing class name.
      * @return array Results from all platforms.
      */
-    public function shareForOwner($owner, array $platforms, string $caption, string $url, ?int $ownerId = null): array
+    public function shareUrl($owner, array $platforms, string $caption, string $url, ?int $ownerId = null): array
     {
-        return $this->executeOnPlatforms($platforms, 'share', [$caption, $url], $owner, $ownerId);
+        return $this->executeOnPlatforms($platforms, 'shareUrl', [$caption, $url], $owner, $ownerId);
     }
 
     /**
@@ -317,7 +257,7 @@ class SocialMediaManager
      * @param int|null $ownerId Optional owner ID if passing class name.
      * @return array Results from all platforms.
      */
-    public function shareImageForOwner($owner, array $platforms, string $caption, string $image_url, ?int $ownerId = null): array
+    public function shareImage($owner, array $platforms, string $caption, string $image_url, ?int $ownerId = null): array
     {
         return $this->executeOnPlatforms($platforms, 'shareImage', [$caption, $image_url], $owner, $ownerId);
     }
@@ -332,7 +272,7 @@ class SocialMediaManager
      * @param int|null $ownerId Optional owner ID if passing class name.
      * @return array Results from all platforms.
      */
-    public function shareVideoForOwner($owner, array $platforms, string $caption, string $video_url, ?int $ownerId = null): array
+    public function shareVideo($owner, array $platforms, string $caption, string $video_url, ?int $ownerId = null): array
     {
         return $this->executeOnPlatforms($platforms, 'shareVideo', [$caption, $video_url], $owner, $ownerId);
     }

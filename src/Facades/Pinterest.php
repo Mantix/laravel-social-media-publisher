@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Facade;
 /**
  * Class Pinterest
  *
- * @method static mixed share(string $caption, string $url)
+ * @method static mixed shareUrl(string $caption, string $url)
  * @method static mixed shareImage(string $caption, string $image_url)
  * @method static mixed shareVideo(string $caption, string $video_url)
  * @method static mixed createPin(string $note, string $mediaUrl, string $mediaType = 'image')

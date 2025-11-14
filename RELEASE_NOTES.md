@@ -1,5 +1,90 @@
 # Release Notes
 
+## 🎉 Laravel Social Media Publisher v2.0.2 - API Cleanup & Method Naming Improvements
+
+**Release Date**: November 14, 2025  
+**Version**: 2.0.2  
+**Type**: Minor Release
+
+---
+
+## 🔄 What's Changed
+
+### Method Renaming for Clarity
+To improve API clarity and consistency, the following methods have been renamed:
+
+- ✅ **`share()` → `shareUrl()`**: Renamed across all services to clearly indicate URL sharing
+- ✅ **Removed deprecated methods**: All non-owner methods have been removed from `SocialMediaManager`
+- ✅ **Removed "ForOwner" suffix**: Since owners are always required, cleaner method names without suffix
+- ✅ **Added `shareText()`**: New method for text-only posts (owners always required)
+
+### Why This Change?
+The new naming makes it clear that:
+- `shareText()` - Shares text-only content (no URL) for a specific owner
+- `shareUrl()` - Shares content with a URL for a specific owner
+- `shareImage()` - Shares images for a specific owner
+- `shareVideo()` - Shares videos for a specific owner
+
+Since owners are always required (OAuth connections), the "ForOwner" suffix has been removed for cleaner API naming.
+
+### Removed Deprecated Methods
+The following methods have been **removed** from `SocialMediaManager`:
+- ❌ `shareUrl()` (old version without owner) - Use `shareUrl($owner, ...)` instead
+- ❌ `shareImage()` (old version without owner) - Use `shareImage($owner, ...)` instead
+- ❌ `shareVideo()` (old version without owner) - Use `shareVideo($owner, ...)` instead
+- ❌ `shareUrlToAll()` - Use `shareUrl()` with all platforms
+- ❌ `shareImageToAll()` - Use `shareImage()` with all platforms
+- ❌ `shareVideoToAll()` - Use `shareVideo()` with all platforms
+
+### Migration Guide
+
+**⚠️ BREAKING CHANGE**: If you're using the old method names, you'll need to update your code.
+
+#### Before (v2.0.0 - v2.0.1):
+```php
+// Old method names (NO LONGER WORK)
+$service->share('Hello', 'https://example.com');
+SocialMedia::share(['facebook', 'twitter'], 'Hello', 'https://example.com');
+SocialMedia::shareToAll('Hello', 'https://example.com');
+SocialMedia::shareForOwner($user, ['facebook'], 'Hello', 'https://example.com');
+```
+
+#### After (v2.0.2+):
+```php
+// New method names - ALL require owner (no "ForOwner" suffix needed)
+$user = User::find(1);
+
+// Text-only posts
+SocialMedia::shareText($user, ['facebook', 'twitter'], 'Hello World!');
+
+// URL posts
+SocialMedia::shareUrl($user, ['facebook', 'twitter'], 'Hello', 'https://example.com');
+
+// Image posts
+SocialMedia::shareImage($user, ['instagram', 'pinterest'], 'Check this out!', 'https://example.com/image.jpg');
+
+// Video posts
+SocialMedia::shareVideo($user, ['youtube', 'tiktok'], 'Watch this!', 'https://example.com/video.mp4');
+```
+
+### Updated Services
+All platform services have been updated:
+- ✅ LinkedInService - `share()` → `shareUrl()`, added `shareText()`
+- ✅ FacebookService - `share()` → `shareUrl()`, added `shareText()`
+- ✅ TwitterService - `share()` → `shareUrl()`, added `shareText()`
+- ✅ TelegramService - `share()` → `shareUrl()`, added `shareText()`
+- ✅ InstagramService - `share()` → `shareUrl()`
+- ✅ PinterestService - `share()` → `shareUrl()`
+- ✅ TikTokService - `share()` → `shareUrl()`
+- ✅ YouTubeService - `share()` → `shareUrl()`
+
+### Updated Facades
+All facades have been updated with new method signatures:
+- ✅ SocialMedia facade - Clean method names without "ForOwner" suffix (owners always required)
+- ✅ All platform facades - Updated method signatures
+
+---
+
 ## 🎉 Laravel Social Media Publisher v2.0.0 - Multi-User Support & OAuth Integration
 
 **Release Date**: January 2025  
