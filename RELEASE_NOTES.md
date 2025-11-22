@@ -1,6 +1,6 @@
 # Release Notes
 
-## v2.1.2
+## v2.1.2 - Renamed Facades
 
 We renamed Twitter to X and FaceBook to Facebook everywhere.
 
