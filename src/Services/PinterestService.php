@@ -2,461 +2,271 @@
 
 namespace Mantix\LaravelSocialMediaPublisher\Services;
 
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Mantix\LaravelSocialMediaPublisher\Contracts\ShareImagePostInterface;
 use Mantix\LaravelSocialMediaPublisher\Contracts\ShareInterface;
 use Mantix\LaravelSocialMediaPublisher\Contracts\ShareVideoPostInterface;
 use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
-use Illuminate\Support\Facades\Log;
+use Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 
 /**
  * Class PinterestService
  *
  * Service for managing and publishing content to Pinterest using the Pinterest API v5.
  *
- * Implements sharing of images and videos to Pinterest.
+ * @package Mantix\LaravelSocialMediaPublisher\Services
  */
-class PinterestService extends SocialMediaService implements ShareInterface, ShareImagePostInterface, ShareVideoPostInterface
-{
-    /**
-     * @var string Pinterest Access Token
-     */
-    private $access_token;
+class PinterestService extends SocialMediaService implements ShareInterface, ShareImagePostInterface, ShareVideoPostInterface {
+    /** @var string Pinterest Access Token */
+    private string $accessToken;
 
-    /**
-     * @var string Pinterest Board ID
-     */
-    private $board_id;
+    /** @var string|null Default Board ID for this connection */
+    private ?string $defaultBoardId;
 
-    /**
-     * @var PinterestService|null Singleton instance
-     */
-    private static ?PinterestService $instance = null;
-
-    /**
-     * Pinterest API base URL
-     */
+    /** @var string Pinterest API base URL */
     private const API_BASE_URL = 'https://api.pinterest.com/v5';
 
     /**
-     * Private constructor to prevent direct instantiation.
+     * PinterestService constructor.
+     *
+     * @param string $accessToken
+     * @param string|null $defaultBoardId
      */
-    private function __construct(
-        string $accessToken,
-        string $boardId
-    ) {
-        $this->access_token = $accessToken;
-        $this->board_id = $boardId;
-    }
-
-    /**
-     * Get instance - OAuth connection required.
-     * 
-     * @return PinterestService
-     * @throws SocialMediaException
-     * @deprecated Use forConnection() with a SocialMediaConnection instead
-     */
-    public static function getInstance(): PinterestService
-    {
-        throw new SocialMediaException('OAuth connection required. Please use forConnection() with a SocialMediaConnection or authenticate via OAuth first.');
+    public function __construct(string $accessToken, ?string $defaultBoardId = null) {
+        $this->accessToken = $accessToken;
+        $this->defaultBoardId = $defaultBoardId;
     }
 
     /**
      * Create a new instance from a SocialMediaConnection.
      *
-     * @param \mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection
-     * @return PinterestService
+     * @param SocialMediaConnection $connection
+     * @return self
      * @throws SocialMediaException
      */
-    public static function forConnection(\mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection): PinterestService
-    {
+    public static function forConnection(SocialMediaConnection $connection): self {
         if ($connection->platform !== 'pinterest') {
-            throw new SocialMediaException('Connection is not for Pinterest platform.');
+            throw new SocialMediaException('Connection is not for the Pinterest platform.');
         }
 
         $accessToken = $connection->getDecryptedAccessToken();
-        $metadata = $connection->metadata ?? [];
-        $boardId = $metadata['board_id'] ?? null;
 
-        if (!$accessToken || !$boardId) {
-            throw new SocialMediaException('Pinterest connection is missing required credentials.');
+        // Check metadata for a selected default board
+        $metadata = $connection->metadata ?? [];
+        $boardId = $metadata['default_board_id'] ?? null;
+
+        if (!$accessToken) {
+            throw new SocialMediaException('Pinterest connection is missing an access token.');
         }
 
         return new self($accessToken, $boardId);
     }
 
+    /* --------------------------------------------------------------------------
+     * AUTHENTICATION & BOARDS
+     * -------------------------------------------------------------------------- */
+
     /**
-     * Share a text post with a URL to Pinterest.
-     * Note: Pinterest doesn't support direct text posts, so this creates a pin with the URL as the link.
+     * Get the Authorization URL.
      *
-     * @param string $caption The text content of the post.
-     * @param string $url The URL to share.
-     * @return array Response from the Pinterest API.
-     * @throws SocialMediaException
+     * @param string $redirectUri
+     * @param array $scopes
+     * @param string|null $state
+     * @return string
      */
-    public function shareUrl(string $caption, string $url): array
-    {
-        $this->validateInput($caption, $url);
-        
-        try {
-            // Pinterest doesn't support direct text posts
-            // We'll create a pin with the URL as the link
-            return $this->createPin($caption, $url, 'link');
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to share to Pinterest', [
-                'platform' => 'pinterest',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'url' => $url,
-            ]);
-            throw new SocialMediaException('Failed to share to Pinterest: ' . $e->getMessage());
+    public static function getAuthorizationUrl(
+        string $redirectUri,
+        array $scopes = ['boards:read', 'pins:read', 'pins:write', 'user_accounts:read'],
+        ?string $state = null
+    ): string {
+        $clientId = config('social_media_publisher.pinterest_client_id');
+
+        if (!$clientId) {
+            throw new SocialMediaException('Pinterest Client ID is not configured.');
         }
+
+        $state = $state ?? bin2hex(random_bytes(16));
+        $scopeString = implode(',', $scopes);
+
+        return sprintf(
+            'https://www.pinterest.com/oauth/?client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s',
+            urlencode($clientId),
+            urlencode($redirectUri),
+            urlencode($scopeString),
+            urlencode($state)
+        );
     }
 
     /**
-     * Share an image post with a caption to Pinterest.
+     * Handle OAuth Callback.
      *
-     * @param string $caption The caption to accompany the image.
-     * @param string $image_url The URL of the image.
-     * @return array Response from the Pinterest API.
-     * @throws SocialMediaException
+     * @param string $code
+     * @param string $redirectUri
+     * @return array
      */
-    public function shareImage(string $caption, string $image_url): array
-    {
-        $this->validateInput($caption, $image_url);
-        
-        try {
-            return $this->createPin($caption, $image_url, 'image');
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to share image to Pinterest', [
-                'platform' => 'pinterest',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'image_url' => $image_url,
-            ]);
-            throw new SocialMediaException('Failed to share image to Pinterest: ' . $e->getMessage());
-        }
-    }
+    public static function handleCallback(string $code, string $redirectUri): array {
+        $clientId = config('social_media_publisher.pinterest_client_id');
+        $clientSecret = config('social_media_publisher.pinterest_client_secret');
 
-    /**
-     * Share a video post with a caption to Pinterest.
-     *
-     * @param string $caption The caption to accompany the video.
-     * @param string $video_url The URL of the video.
-     * @return array Response from the Pinterest API.
-     * @throws SocialMediaException
-     */
-    public function shareVideo(string $caption, string $video_url): array
-    {
-        $this->validateInput($caption, $video_url);
-        
-        try {
-            return $this->createPin($caption, $video_url, 'video');
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to share video to Pinterest', [
-                'platform' => 'pinterest',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'video_url' => $video_url,
-            ]);
-            throw new SocialMediaException('Failed to share video to Pinterest: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Create a pin on Pinterest.
-     *
-     * @param string $note The pin description.
-     * @param string $mediaUrl The URL of the media.
-     * @param string $mediaType The type of media (image, video, link).
-     * @return array Response from the Pinterest API.
-     * @throws SocialMediaException
-     */
-    public function createPin(string $note, string $mediaUrl, string $mediaType = 'image'): array
-    {
-        try {
-            $url = $this->buildApiUrl('pins');
-            $params = [
-                'board_id' => $this->board_id,
-                'media_source' => [
-                    'source_type' => 'url',
-                    'url' => $mediaUrl
-                ],
-                'note' => $note,
-                'title' => $this->extractTitleFromNote($note)
-            ];
-
-            // Add link if it's a link type pin
-            if ($mediaType === 'link') {
-                $params['link'] = $mediaUrl;
-            }
-
-            $response = $this->sendRequest($url, 'post', $params);
-            $this->log('info', 'Pinterest pin created successfully', [
-                'platform' => 'pinterest',
-                'pin_id' => $response['id'] ?? null,
-                'board_id' => $this->board_id,
-            ]);
-            return $response;
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to create Pinterest pin', [
-                'platform' => 'pinterest',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'board_id' => $this->board_id,
-            ]);
-            throw new SocialMediaException('Failed to create Pinterest pin: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Create a board on Pinterest.
-     *
-     * @param string $name The board name.
-     * @param string $description The board description.
-     * @param string $privacy The privacy setting (PUBLIC or SECRET).
-     * @return array Response from the Pinterest API.
-     * @throws SocialMediaException
-     */
-    public function createBoard(string $name, string $description = '', string $privacy = 'PUBLIC'): array
-    {
-        try {
-            $url = $this->buildApiUrl('boards');
-            $params = [
-                'name' => $name,
-                'description' => $description,
-                'privacy' => $privacy
-            ];
-
-            $response = $this->sendRequest($url, 'post', $params);
-            $this->log('info', 'Pinterest board created successfully', [
-                'platform' => 'pinterest',
-                'board_id' => $response['id'] ?? null,
-                'board_name' => $name,
-            ]);
-            return $response;
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to create Pinterest board', [
-                'platform' => 'pinterest',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'board_name' => $name,
-            ]);
-            throw new SocialMediaException('Failed to create Pinterest board: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Get user's boards.
-     *
-     * @param int $pageSize Number of boards to retrieve per page.
-     * @return array Response from the Pinterest API.
-     * @throws SocialMediaException
-     */
-    public function getBoards(int $pageSize = 25): array
-    {
-        try {
-            $url = $this->buildApiUrl('boards');
-            $params = [
-                'page_size' => min($pageSize, 250)
-            ];
-
-            return $this->sendRequest($url, 'get', $params);
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to get Pinterest boards', [
-                'platform' => 'pinterest',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'limit' => $limit,
-            ]);
-            throw new SocialMediaException('Failed to get Pinterest boards: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Get pins from a board.
-     *
-     * @param string $boardId The board ID.
-     * @param int $pageSize Number of pins to retrieve per page.
-     * @return array Response from the Pinterest API.
-     * @throws SocialMediaException
-     */
-    public function getBoardPins(string $boardId, int $pageSize = 25): array
-    {
-        try {
-            $url = $this->buildApiUrl("boards/{$boardId}/pins");
-            $params = [
-                'page_size' => min($pageSize, 250)
-            ];
-
-            return $this->sendRequest($url, 'get', $params);
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to get Pinterest board pins', [
-                'platform' => 'pinterest',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'board_id' => $boardId,
-                'limit' => $limit,
-            ]);
-            throw new SocialMediaException('Failed to get Pinterest board pins: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Get user profile information.
-     *
-     * @return array Response from the Pinterest API.
-     * @throws SocialMediaException
-     */
-    public function getUserInfo(): array
-    {
-        try {
-            $url = $this->buildApiUrl('user_account');
-            $params = [
-                'fields' => 'id,username,account_type,profile_image,website_url,bio,pin_count,board_count,follower_count,following_count'
-            ];
-
-            return $this->sendRequest($url, 'get', $params);
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to get Pinterest user info', [
-                'platform' => 'pinterest',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-            ]);
-            throw new SocialMediaException('Failed to get Pinterest user info: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Get pin analytics.
-     *
-     * @param string $pinId The Pinterest pin ID.
-     * @return array Response from the Pinterest API.
-     * @throws SocialMediaException
-     */
-    public function getPinAnalytics(string $pinId): array
-    {
-        try {
-            $url = $this->buildApiUrl("pins/{$pinId}/analytics");
-            $params = [
-                'start_date' => date('Y-m-d', strtotime('-30 days')),
-                'end_date' => date('Y-m-d'),
-                'metric_types' => 'IMPRESSION,SAVE,CLICKTHROUGH'
-            ];
-
-            return $this->sendRequest($url, 'get', $params);
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to get Pinterest pin analytics', [
-                'platform' => 'pinterest',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'pin_id' => $pinId,
-            ]);
-            throw new SocialMediaException('Failed to get Pinterest pin analytics: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Search for pins.
-     *
-     * @param string $query The search query.
-     * @param int $pageSize Number of pins to retrieve per page.
-     * @return array Response from the Pinterest API.
-     * @throws SocialMediaException
-     */
-    public function searchPins(string $query, int $pageSize = 25): array
-    {
-        try {
-            $url = $this->buildApiUrl('search/pins');
-            $params = [
-                'query' => $query,
-                'page_size' => min($pageSize, 250)
-            ];
-
-            return $this->sendRequest($url, 'get', $params);
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to search Pinterest pins', [
-                'platform' => 'pinterest',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'query' => $query,
-            ]);
-            throw new SocialMediaException('Failed to search Pinterest pins: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Extract title from note.
-     *
-     * @param string $note The pin note/description.
-     * @return string The extracted title.
-     */
-    private function extractTitleFromNote(string $note): string
-    {
-        $lines = explode("\n", $note);
-        $title = trim($lines[0]);
-        
-        // Limit title to 100 characters
-        if (strlen($title) > 100) {
-            $title = substr($title, 0, 97) . '...';
-        }
-        
-        return $title ?: 'Shared Pin';
-    }
-
-    /**
-     * Validate input parameters.
-     *
-     * @param string $caption The caption text.
-     * @param string $url The URL.
-     * @throws SocialMediaException
-     */
-    private function validateInput(string $caption, string $url): void
-    {
-        if (empty(trim($caption))) {
-            throw new SocialMediaException('Caption cannot be empty.');
-        }
-
-        if (!filter_var($url, FILTER_VALIDATE_URL)) {
-            throw new SocialMediaException('Invalid URL provided.');
-        }
-    }
-
-    /**
-     * Build Pinterest API URL.
-     *
-     * @param string $endpoint The API endpoint.
-     * @return string Complete API URL.
-     */
-    private function buildApiUrl(string $endpoint): string
-    {
-        return self::API_BASE_URL . '/' . $endpoint;
-    }
-
-    /**
-     * Send authenticated request to Pinterest API.
-     *
-     * @param string $url The API URL.
-     * @param string $method The HTTP method.
-     * @param array $params The request parameters.
-     * @return array Response from the API.
-     * @throws SocialMediaException
-     */
-    protected function sendRequest(string $url, string $method = 'post', array $params = [], array $headers = []): array
-    {
-        $defaultHeaders = [
-            'Authorization' => 'Bearer ' . $this->access_token,
-            'Content-Type' => 'application/json'
-        ];
-        
-        $headers = array_merge($defaultHeaders, $headers);
-
-        $response = \Illuminate\Support\Facades\Http::withHeaders($headers)
-            ->{$method}($url, $params);
+        $response = Http::asForm()->withBasicAuth($clientId, $clientSecret)->post(self::API_BASE_URL . '/oauth/token', [
+            'grant_type' => 'authorization_code',
+            'code' => $code,
+            'redirect_uri' => $redirectUri,
+        ]);
 
         if (!$response->successful()) {
-            $errorData = $response->json();
-            $errorMessage = $errorData['message'] ?? 'Unknown error occurred';
-            throw new SocialMediaException("Pinterest API error: {$errorMessage}");
+            throw new SocialMediaException('Failed to retrieve Pinterest access token: ' . $response->body());
+        }
+
+        // Fetch User Profile immediately to get the username/ID
+        $tokenData = $response->json();
+
+        // Create temp service to fetch profile
+        $tempService = new self($tokenData['access_token']);
+        $profile = $tempService->getUserInfo();
+
+        return array_merge($tokenData, ['profile' => $profile]);
+    }
+
+    /**
+     * Get all boards for the authenticated user.
+     * Use this to let the user select a default board.
+     *
+     * @return array
+     */
+    public function getBoards(): array {
+        $response = $this->sendRequest('get', 'boards', ['page_size' => 100]);
+        return $response['items'] ?? [];
+    }
+
+    /**
+     * Create a new Board.
+     *
+     * @param string $name
+     * @param string $description
+     * @param string $privacy 'PUBLIC' or 'SECRET'
+     * @return array
+     */
+    public function createBoard(string $name, string $description = '', string $privacy = 'PUBLIC'): array {
+        return $this->sendRequest('post', 'boards', [
+            'name' => $name,
+            'description' => $description,
+            'privacy' => $privacy
+        ]);
+    }
+
+    /* --------------------------------------------------------------------------
+     * PUBLISHING METHODS
+     * -------------------------------------------------------------------------- */
+
+    /**
+     * Share a link as a Pin.
+     * * @param string $caption Pin Description
+     * @param string $url The destination Link
+     * @return array
+     */
+    public function shareUrl(string $caption, string $url): array {
+        $this->ensureBoardIsSet();
+
+        // Pinterest requires an image for a Link Pin. 
+        // We cannot scrape the URL here reliable. 
+        // If your app has a default "link icon" image, you could use it, 
+        // but ideally, you should use shareImage() instead.
+        throw new SocialMediaException("Pinterest requires an image to create a Pin. Please use shareImage() instead of shareUrl().");
+    }
+
+    /**
+     * Share an Image Pin.
+     *
+     * @param string $caption Pin Description
+     * @param string $imageUrl Public URL of the image
+     * @return array
+     */
+    public function shareImage(string $caption, string $imageUrl): array {
+        return $this->createPin([
+            'title' => $this->generateTitle($caption),
+            'description' => $caption,
+            'media_source' => [
+                'source_type' => 'image_url',
+                'url' => $imageUrl
+            ]
+        ]);
+    }
+
+    /**
+     * Share a Video Pin.
+     * * @param string $caption
+     * @param string $videoUrl
+     * @return array
+     */
+    public function shareVideo(string $caption, string $videoUrl): array {
+        // Pinterest Video Pins via URL REQUIRE a cover_image_url.
+        // Since the standard interface doesn't support a 3rd argument for cover image,
+        // we must throw an exception or require the user to use createPin() directly.
+
+        throw new SocialMediaException("Pinterest requires a 'cover_image_url' for video pins. Please use the createPin() method directly and provide a cover image.");
+    }
+
+    /**
+     * Manually Create a Pin (Flexible Method).
+     * Use this if you need to set specific titles, links, or video cover images.
+     *
+     * @param array $data
+     * @param string|null $boardId Override default board
+     * @return array
+     */
+    public function createPin(array $data, ?string $boardId = null): array {
+        $boardId = $boardId ?? $this->defaultBoardId;
+
+        if (!$boardId) {
+            throw new SocialMediaException('No Board ID provided for Pinterest Pin.');
+        }
+
+        $payload = array_merge([
+            'board_id' => $boardId,
+        ], $data);
+
+        return $this->sendRequest('post', 'pins', $payload);
+    }
+
+    /**
+     * Get User Info.
+     *
+     * @return array
+     */
+    public function getUserInfo(): array {
+        return $this->sendRequest('get', 'user_account');
+    }
+
+    /* --------------------------------------------------------------------------
+     * INTERNAL HELPERS
+     * -------------------------------------------------------------------------- */
+
+    private function ensureBoardIsSet(): void {
+        if (!$this->defaultBoardId) {
+            throw new SocialMediaException('Default Board ID is not set for this connection. Please update the connection settings.');
+        }
+    }
+
+    private function generateTitle(string $text): string {
+        // Pinterest Titles are max 100 chars
+        $title = strtok($text, "\n"); // First line
+        return mb_substr($title ?: 'New Pin', 0, 100);
+    }
+
+    protected function sendRequest(string $method, string $endpoint, array $params = [], array $headers = []): array {
+        $url = self::API_BASE_URL . '/' . $endpoint;
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $this->accessToken,
+            'Content-Type' => 'application/json',
+        ])->$method($url, $params);
+
+        if (!$response->successful()) {
+            $error = $response->json()['message'] ?? $response->body();
+            Log::error("Pinterest API Error [{$endpoint}]", ['error' => $error]);
+            throw new SocialMediaException("Pinterest API Error: $error");
         }
 
         return $response->json();

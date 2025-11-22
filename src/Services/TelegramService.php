@@ -2,224 +2,268 @@
 
 namespace Mantix\LaravelSocialMediaPublisher\Services;
 
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Mantix\LaravelSocialMediaPublisher\Contracts\ShareDocumentPostInterface;
 use Mantix\LaravelSocialMediaPublisher\Contracts\ShareImagePostInterface;
 use Mantix\LaravelSocialMediaPublisher\Contracts\ShareInterface;
 use Mantix\LaravelSocialMediaPublisher\Contracts\ShareVideoPostInterface;
 use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
-use Illuminate\Support\Facades\Log;
+use Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 
 /**
  * Class TelegramService
  *
- * Service for sharing posts to Telegram using Telegram Bot API.
+ * Service for sharing posts to Telegram Channels or Groups using the Telegram Bot API.
  *
- * Implements sharing of general posts, images, documents, and videos.
+ * @package Mantix\LaravelSocialMediaPublisher\Services
  */
-class TelegramService extends SocialMediaService implements ShareInterface,
-    ShareImagePostInterface, ShareVideoPostInterface, ShareDocumentPostInterface {
+class TelegramService extends SocialMediaService implements ShareInterface, ShareImagePostInterface, ShareVideoPostInterface, ShareDocumentPostInterface {
+    /** @var string Telegram Bot Token */
+    private string $botToken;
 
+    /** @var string Target Chat ID (Channel or Group ID) */
+    private string $chatId;
 
-    /**
-     * @var string Telegram bot token
-     */
-    private $telegram_bot_token;
-
-    /**
-     * @var string Telegram chat ID
-     */
-    private $chat_id;
+    /** @var string Telegram API Base URL */
+    private const API_BASE_URL = 'https://api.telegram.org/bot';
 
     /**
-     * @var TelegramService|null Singleton instance
+     * TelegramService Constructor.
+     *
+     * @param string $botToken
+     * @param string $chatId
      */
-    private static ?TelegramService $instance = null;
-
-    /**
-     * Private constructor to prevent direct instantiation.
-     */
-
-    private function __construct(string $telegram_bot_token, string $chat_id) {
-        $this->telegram_bot_token = $telegram_bot_token;
-        $this->chat_id = $chat_id;
+    public function __construct(string $botToken, string $chatId) {
+        $this->botToken = $botToken;
+        $this->chatId = $chatId;
     }
 
     /**
-     * Get the singleton instance of TelegramService.
+     * Create a new instance from a SocialMediaConnection.
      *
-     * @return TelegramService
-     */
-    public static function getInstance(): TelegramService {
-        if (self::$instance === null) {
-            $telegramBotToken = config('social_media_publisher.telegram_bot_token');
-            $chatId = config('social_media_publisher.telegram_chat_id');
-            self::$instance = new self($telegramBotToken, $chatId);
-        }
-        return self::$instance;
-    }
-
-    /**
-     * Share a text post with a caption and a URL.
-     *
-     * @param string $caption The caption to accompany the post.
-     * @param string $url The URL to share.
-     *
-     * @return array Response from the Telegram API.
+     * @param SocialMediaConnection $connection
+     * @return self
      * @throws SocialMediaException
      */
-    public function shareUrl(string $caption, string $url): array
-    {
-        $this->validateText($caption, 4096);
-        $this->validateUrl($url);
-        
-        try {
-            $sendMessageUrl = $this->buildApiUrl('sendMessage');
-            $params = [
-                'chat_id'    => $this->chat_id,
-                'text'       => $caption . "\n" . $url,
-                'parse_mode' => 'Markdown',
-            ];
-
-            $response = $this->sendRequest($sendMessageUrl, 'post', $params);
-            $this->log('info', 'Telegram message sent successfully', [
-                'platform' => 'telegram',
-                'message_id' => $response['result']['message_id'] ?? null,
-                'chat_id' => $this->chat_id,
-                'caption_length' => strlen($caption),
-            ]);
-            return $response;
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to send Telegram message', [
-                'platform' => 'telegram',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'chat_id' => $this->chat_id,
-            ]);
-            throw new SocialMediaException('Failed to send Telegram message: ' . $e->getMessage());
+    public static function forConnection(SocialMediaConnection $connection): self {
+        if ($connection->platform !== 'telegram') {
+            throw new SocialMediaException('Connection is not for the Telegram platform.');
         }
-    }
 
-    /**
-     * Share a text-only message to Telegram (without URL or image).
-     *
-     * @param string $caption The text content of the message.
-     * @return array Response from the Telegram API.
-     * @throws SocialMediaException
-     */
-    public function shareText(string $caption): array
-    {
-        $this->validateText($caption, 4096);
-        
-        try {
-            $sendMessageUrl = $this->buildApiUrl('sendMessage');
-            $params = [
-                'chat_id'    => $this->chat_id,
-                'text'       => $caption,
-                'parse_mode' => 'Markdown',
-            ];
+        // We store the Bot Token in 'access_token' column
+        $botToken = $connection->getDecryptedAccessToken();
 
-            $response = $this->sendRequest($sendMessageUrl, 'post', $params);
-            $this->log('info', 'Telegram text-only message sent successfully', [
-                'platform' => 'telegram',
-                'message_id' => $response['result']['message_id'] ?? null,
-                'chat_id' => $this->chat_id,
-                'caption_length' => strlen($caption),
-            ]);
-            return $response;
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to send text-only Telegram message', [
-                'platform' => 'telegram',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'chat_id' => $this->chat_id,
-            ]);
-            throw new SocialMediaException('Failed to send text-only Telegram message: ' . $e->getMessage());
+        // We store the Channel/Chat ID in 'platform_user_id' column
+        $chatId = $connection->platform_user_id;
+
+        if (!$botToken || !$chatId) {
+            throw new SocialMediaException('Telegram connection is missing Bot Token or Chat ID.');
         }
+
+        return new self($botToken, $chatId);
     }
 
+    /* --------------------------------------------------------------------------
+     * SETUP & DISCOVERY METHODS
+     * -------------------------------------------------------------------------- */
+
     /**
-     * Share an image post with a caption and an image URL.
+     * Verify a Bot Token is valid and get Bot info.
+     * Useful during the connection setup phase.
      *
-     * @param string $caption The caption to accompany the image.
-     * @param string $image_url The URL of the image.
-     *
-     * @return mixed Response from the Telegram API.
+     * @param string $token
+     * @return array
      */
-
-    public function shareImage(string $caption, string $image_url): array {
-        $sendPhotoUrl = $this->buildApiUrl('sendPhoto');
-        $params = [
-            'chat_id'    => $this->chat_id,
-            'photo'      => $image_url,
-            'caption'    => $caption,
-            'parse_mode' => 'Markdown',
-        ];
-
-        return $this->sendRequest($sendPhotoUrl, 'post', $params);
+    public static function verifyBotToken(string $token): array {
+        $service = new self($token, 'dummy_chat_id');
+        return $service->sendRequest('get', 'getMe');
     }
 
     /**
-     * Share a document post with a caption and a document URL.
+     * Get recent updates to find Chat IDs.
+     * Useful to help the user find the ID of the channel they added the bot to.
      *
-     * @param string $caption The caption to accompany the document.
-     * @param string $document_url The URL of the document.
-     *
-     * @return mixed Response from the Telegram API.
+     * @param string|null $token Optional token override
+     * @return array
      */
-    public function shareDocument(string $caption, string $document_url): array {
-        $sendDocumentUrl = $this->buildApiUrl('sendDocument');
-        $params = [
-            'chat_id'    => $this->chat_id,
-            'document'   => $document_url,
-            'caption'    => $caption,
-            'parse_mode' => 'Markdown',
-        ];
+    public function getUpdates(?string $token = null): array {
+        // Allow static usage logic or instance usage
+        $token = $token ?? $this->botToken;
+        $url = self::API_BASE_URL . $token . '/getUpdates';
 
-        return $this->sendRequest($sendDocumentUrl, 'post', $params);
+        $response = Http::get($url);
+
+        if (!$response->successful()) {
+            throw new SocialMediaException("Failed to get Telegram updates: " . $response->body());
+        }
+
+        return $response->json()['result'] ?? [];
     }
 
+    /* --------------------------------------------------------------------------
+     * PUBLISHING METHODS
+     * -------------------------------------------------------------------------- */
+
     /**
-     * Share a video post with a caption and a video URL.
+     * Share a text post with a URL.
      *
-     * @param string $caption The caption to accompany the video.
-     * @param string $video_url The URL of the video.
-     *
-     * @return mixed Response from the Telegram API.
+     * @param string $caption
+     * @param string $url
+     * @return array
      */
-    public function shareVideo(string $caption, string $video_url): array {
-        $sendVideoUrl = $this->buildApiUrl('sendVideo');
-        $params = [
-            'chat_id'    => $this->chat_id,
-            'video'      => $video_url,
-            'caption'    => $caption,
-            'parse_mode' => 'Markdown',
-        ];
+    public function shareUrl(string $caption, string $url): array {
+        // Telegram doesn't have a specific "Link Post". We append the URL.
+        // We disable web page preview if you want just the link, 
+        // but usually, for sharing, you WANT the preview.
+        $text = $caption . "\n\n" . $url;
 
-        return $this->sendRequest($sendVideoUrl, 'post', $params);
+        return $this->sendMessage($text);
     }
 
     /**
-     * Get updates from the Telegram bot.
+     * Share text-only message.
      *
-     * @return mixed Response from the Telegram API.
+     * @param string $caption
+     * @return array
      */
-
-    public function getUpdates() {
-        $getUpdatesUrl = $this->buildApiUrl('getUpdates');
-        $params = [];
-
-        return $this->sendRequest($getUpdatesUrl, 'get', $params);
+    public function shareText(string $caption): array {
+        return $this->sendMessage($caption);
     }
 
     /**
-     * Helper to build Telegram API URLs.
+     * Share an image.
+     * Supports both Remote URLs and Local File Paths.
+     *
+     * @param string $caption
+     * @param string $imageUrl
+     * @return array
+     */
+    public function shareImage(string $caption, string $imageUrl): array {
+        $this->validateText($caption, 1024); // Caption limit for media is 1024
+
+        // If URL is remote, send as string. If local, attach file.
+        if (filter_var($imageUrl, FILTER_VALIDATE_URL)) {
+            return $this->sendRequest('post', 'sendPhoto', [
+                'chat_id' => $this->chatId,
+                'photo' => $imageUrl,
+                'caption' => $caption,
+                'parse_mode' => 'HTML',
+            ]);
+        }
+
+        return $this->sendWithFileUpload('sendPhoto', 'photo', $imageUrl, [
+            'caption' => $caption,
+            'parse_mode' => 'HTML'
+        ]);
+    }
+
+    /**
+     * Share a video.
+     *
+     * @param string $caption
+     * @param string $videoUrl
+     * @return array
+     */
+    public function shareVideo(string $caption, string $videoUrl): array {
+        $this->validateText($caption, 1024);
+
+        if (filter_var($videoUrl, FILTER_VALIDATE_URL)) {
+            return $this->sendRequest('post', 'sendVideo', [
+                'chat_id' => $this->chatId,
+                'video' => $videoUrl,
+                'caption' => $caption,
+                'parse_mode' => 'HTML',
+            ]);
+        }
+
+        return $this->sendWithFileUpload('sendVideo', 'video', $videoUrl, [
+            'caption' => $caption,
+            'parse_mode' => 'HTML'
+        ]);
+    }
+
+    /**
+     * Share a document (PDF, Zip, etc).
+     *
+     * @param string $caption
+     * @param string $documentUrl
+     * @return array
+     */
+    public function shareDocument(string $caption, string $documentUrl): array {
+        $this->validateText($caption, 1024);
+
+        if (filter_var($documentUrl, FILTER_VALIDATE_URL)) {
+            return $this->sendRequest('post', 'sendDocument', [
+                'chat_id' => $this->chatId,
+                'document' => $documentUrl,
+                'caption' => $caption,
+                'parse_mode' => 'HTML',
+            ]);
+        }
+
+        return $this->sendWithFileUpload('sendDocument', 'document', $documentUrl, [
+            'caption' => $caption,
+            'parse_mode' => 'HTML'
+        ]);
+    }
+
+    /* --------------------------------------------------------------------------
+     * INTERNAL HELPERS
+     * -------------------------------------------------------------------------- */
+
+    /**
+     * Send a basic text message.
+     */
+    private function sendMessage(string $text): array {
+        $this->validateText($text, 4096); // Limit for text messages
+
+        return $this->sendRequest('post', 'sendMessage', [
+            'chat_id' => $this->chatId,
+            'text' => $text,
+            'parse_mode' => 'HTML', // Using HTML allows basic formatting like <b>bold</b>
+            'disable_web_page_preview' => false
+        ]);
+    }
+
+    /**
+     * Handle File Uploads (Multipart/Form-Data).
      *
      * @param string $endpoint
-     *
-     * @return string
+     * @param string $fileField (photo, video, document)
+     * @param string $filePath
+     * @param array $extraParams
+     * @return array
      */
-    private function buildApiUrl(string $endpoint): string {
-        $baseUrl = config('social_media_publisher.telegram_api_base_url');
-        return $baseUrl . $this->telegram_bot_token . '/' . $endpoint;
+    private function sendWithFileUpload(string $endpoint, string $fileField, string $filePath, array $extraParams): array {
+        if (!file_exists($filePath)) {
+            throw new SocialMediaException("File not found for Telegram upload: $filePath");
+        }
+
+        $url = self::API_BASE_URL . $this->botToken . '/' . $endpoint;
+        $extraParams['chat_id'] = $this->chatId;
+
+        $response = Http::timeout(60)
+            ->attach($fileField, file_get_contents($filePath), basename($filePath))
+            ->post($url, $extraParams);
+
+        if (!$response->successful()) {
+            throw new SocialMediaException("Telegram File Upload Error: " . ($response->json()['description'] ?? $response->body()));
+        }
+
+        return $response->json()['result'];
+    }
+
+    /**
+     * Send generic request via Base Class logic.
+     */
+    protected function sendRequest(string $method, string $endpoint, array $params = [], array $headers = []): array {
+        // Build full URL
+        $url = self::API_BASE_URL . $this->botToken . '/' . $endpoint;
+
+        $response = parent::sendRequest($method, $url, $params, $headers);
+
+        // Telegram wraps success in 'result' key
+        return $response['result'] ?? $response;
     }
 }

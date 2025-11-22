@@ -3,21 +3,20 @@
 namespace Mantix\LaravelSocialMediaPublisher\Facades;
 
 use Illuminate\Support\Facades\Facade;
+
 /**
  * Class Telegram
  *
- * @method static mixed shareUrl(string $caption, string $url)
- * @method static mixed shareText(string $caption)
- * @method static mixed shareImage(string $caption, string $image_url)
- * @method static mixed shareDocument(string $caption, string $document_url)
- * @method static mixed shareVideo(string $caption, string $video_url)
- * @method static mixed getUpdates()
+ * Facade for the TelegramService.
  *
- * @see \mantix\LaravelSocialMediaPublisher\Services\TelegramService
+ * @method static mixed verifyBotToken(string $token)
+ * @method static mixed getUpdates(string $token)
+ * @method static \Mantix\LaravelSocialMediaPublisher\Services\TelegramService forConnection(\Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection)
+ *
+ * @see \Mantix\LaravelSocialMediaPublisher\Services\TelegramService
  */
 class Telegram extends Facade {
-
     protected static function getFacadeAccessor() {
-        return \mantix\LaravelSocialMediaPublisher\Services\TelegramService::class;
+        return \Mantix\LaravelSocialMediaPublisher\Services\TelegramService::class;
     }
 }

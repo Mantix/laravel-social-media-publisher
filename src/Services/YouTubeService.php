@@ -2,473 +2,301 @@
 
 namespace Mantix\LaravelSocialMediaPublisher\Services;
 
-use Mantix\LaravelSocialMediaPublisher\Contracts\ShareImagePostInterface;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Mantix\LaravelSocialMediaPublisher\Contracts\ShareInterface;
 use Mantix\LaravelSocialMediaPublisher\Contracts\ShareVideoPostInterface;
 use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
-use Illuminate\Support\Facades\Log;
+use Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 
 /**
  * Class YouTubeService
  *
- * Service for managing and publishing content to YouTube using the YouTube Data API v3.
+ * Service for managing and publishing content to YouTube using the Data API v3.
  *
- * Implements sharing of videos to YouTube.
+ * @package Mantix\LaravelSocialMediaPublisher\Services
  */
-class YouTubeService extends SocialMediaService implements ShareInterface, ShareImagePostInterface, ShareVideoPostInterface
-{
-    /**
-     * @var string YouTube API Key
-     */
-    private $api_key;
+class YouTubeService extends SocialMediaService implements ShareInterface, ShareVideoPostInterface {
+    /** @var string OAuth 2.0 Access Token */
+    private string $accessToken;
 
-    /**
-     * @var string YouTube OAuth Access Token
-     */
-    private $access_token;
-
-    /**
-     * @var string YouTube Channel ID
-     */
-    private $channel_id;
-
-    /**
-     * @var YouTubeService|null Singleton instance
-     */
-    private static ?YouTubeService $instance = null;
-
-    /**
-     * YouTube API base URL
-     */
+    /** @var string YouTube API Base URL */
     private const API_BASE_URL = 'https://www.googleapis.com/youtube/v3';
 
-    /**
-     * Private constructor to prevent direct instantiation.
-     */
-    private function __construct(
-        string $apiKey,
-        string $accessToken,
-        string $channelId
-    ) {
-        $this->api_key = $apiKey;
-        $this->access_token = $accessToken;
-        $this->channel_id = $channelId;
-    }
+    /** @var string YouTube Upload URL */
+    private const UPLOAD_URL = 'https://www.googleapis.com/upload/youtube/v3';
 
     /**
-     * Get instance - OAuth connection required.
-     * 
-     * @return YouTubeService
-     * @throws SocialMediaException
-     * @deprecated Use forConnection() with a SocialMediaConnection instead
+     * YouTubeService Constructor.
+     *
+     * @param string $accessToken
      */
-    public static function getInstance(): YouTubeService
-    {
-        throw new SocialMediaException('OAuth connection required. Please use forConnection() with a SocialMediaConnection or authenticate via OAuth first.');
+    public function __construct(string $accessToken) {
+        $this->accessToken = $accessToken;
     }
 
     /**
      * Create a new instance from a SocialMediaConnection.
      *
-     * @param \mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection
-     * @return YouTubeService
+     * @param SocialMediaConnection $connection
+     * @return self
      * @throws SocialMediaException
      */
-    public static function forConnection(\mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection): YouTubeService
-    {
+    public static function forConnection(SocialMediaConnection $connection): self {
         if ($connection->platform !== 'youtube') {
-            throw new SocialMediaException('Connection is not for YouTube platform.');
+            throw new SocialMediaException('Connection is not for the YouTube platform.');
         }
 
-        $accessToken = $connection->getDecryptedAccessToken();
-        $metadata = $connection->metadata ?? [];
-        $apiKey = $metadata['api_key'] ?? config('social_media_publisher.youtube_client_id');
-        $channelId = $connection->platform_user_id ?? $metadata['channel_id'] ?? null;
+        $token = $connection->getDecryptedAccessToken();
 
-        if (!$accessToken || !$apiKey || !$channelId) {
-            throw new SocialMediaException('YouTube connection is missing required credentials.');
+        if (!$token) {
+            throw new SocialMediaException('YouTube connection is missing Access Token.');
         }
 
-        return new self($apiKey, $accessToken, $channelId);
+        return new self($token);
+    }
+
+    /* --------------------------------------------------------------------------
+     * AUTHENTICATION (OAuth 2.0)
+     * -------------------------------------------------------------------------- */
+
+    /**
+     * Get Authorization URL.
+     *
+     * @param string $redirectUri
+     * @param array $scopes
+     * @param string|null $state
+     * @return string
+     */
+    public static function getAuthorizationUrl(
+        string $redirectUri,
+        array $scopes = ['https://www.googleapis.com/auth/youtube.upload', 'https://www.googleapis.com/auth/youtube.readonly'],
+        ?string $state = null
+    ): string {
+        $clientId = config('social_media_publisher.youtube_client_id');
+
+        if (!$clientId) {
+            throw new SocialMediaException('YouTube Client ID is not configured.');
+        }
+
+        $state = $state ?? bin2hex(random_bytes(16));
+        $scopeString = implode(' ', $scopes);
+
+        return sprintf(
+            'https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=%s&redirect_uri=%s&scope=%s&state=%s&access_type=offline&prompt=consent',
+            urlencode($clientId),
+            urlencode($redirectUri),
+            urlencode($scopeString),
+            urlencode($state)
+        );
     }
 
     /**
-     * Share a text post with a URL to YouTube.
-     * Note: YouTube doesn't support direct text posts, so this creates a community post.
+     * Handle OAuth Callback.
      *
-     * @param string $caption The text content of the post.
-     * @param string $url The URL to share.
-     * @return array Response from the YouTube API.
-     * @throws SocialMediaException
+     * @param string $code
+     * @param string $redirectUri
+     * @return array
      */
-    public function shareUrl(string $caption, string $url): array
-    {
-        $this->validateInput($caption, $url);
-        
+    public static function handleCallback(string $code, string $redirectUri): array {
+        $clientId = config('social_media_publisher.youtube_client_id');
+        $clientSecret = config('social_media_publisher.youtube_client_secret');
+
+        $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [
+            'code' => $code,
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
+            'redirect_uri' => $redirectUri,
+            'grant_type' => 'authorization_code',
+        ]);
+
+        if (!$response->successful()) {
+            throw new SocialMediaException('Failed to retrieve YouTube tokens: ' . $response->body());
+        }
+
+        $data = $response->json();
+
+        // Fetch Channel Info for Identity
+        $tempService = new self($data['access_token']);
+        $channel = $tempService->getChannelInfo();
+
+        return array_merge($data, ['channel' => $channel['items'][0] ?? []]);
+    }
+
+    /**
+     * Refresh Access Token.
+     *
+     * @param string $refreshToken
+     * @return array
+     */
+    public static function refreshAccessToken(string $refreshToken): array {
+        $clientId = config('social_media_publisher.youtube_client_id');
+        $clientSecret = config('social_media_publisher.youtube_client_secret');
+
+        $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [
+            'refresh_token' => $refreshToken,
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
+            'grant_type' => 'refresh_token',
+        ]);
+
+        if (!$response->successful()) {
+            throw new SocialMediaException('Failed to refresh YouTube token: ' . $response->body());
+        }
+
+        return $response->json();
+    }
+
+    /* --------------------------------------------------------------------------
+     * PUBLISHING METHODS
+     * -------------------------------------------------------------------------- */
+
+    /**
+     * Share Video (Resumable Upload).
+     *
+     * @param string $caption Video Title (Description appended if long)
+     * @param string $videoUrl
+     * @return array
+     */
+    public function shareVideo(string $caption, string $videoUrl): array {
+        $this->validateText($caption, 100); // Title limit
+
+        // 1. Prepare local file
+        $localPath = $this->getTemporaryFilePath($videoUrl);
+
         try {
-            // YouTube doesn't support direct text posts
-            // We'll create a community post
-            return $this->createCommunityPost($caption, $url);
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to share to YouTube', [
-                'platform' => 'youtube',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'url' => $url,
-            ]);
-            throw new SocialMediaException('Failed to share to YouTube: ' . $e->getMessage());
+            // 2. Start Resumable Upload Session
+            $sessionUrl = $this->initResumableUpload($caption, 'Video uploaded via API');
+
+            // 3. Upload File Chunks
+            return $this->performResumableUpload($sessionUrl, $localPath);
+        } finally {
+            if (file_exists($localPath)) {
+                @unlink($localPath);
+            }
         }
     }
 
     /**
-     * Share an image post with a caption to YouTube.
-     * Note: YouTube doesn't support direct image posts, so this creates a community post.
-     *
-     * @param string $caption The caption to accompany the image.
-     * @param string $image_url The URL of the image.
-     * @return array Response from the YouTube API.
-     * @throws SocialMediaException
+     * Share Text (Not Supported).
      */
-    public function shareImage(string $caption, string $image_url): array
-    {
-        $this->validateInput($caption, $image_url);
-        
-        try {
-            // YouTube doesn't support direct image posts
-            // We'll create a community post with the image
-            return $this->createCommunityPost($caption, $image_url, 'image');
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to share image to YouTube', [
-                'platform' => 'youtube',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'image_url' => $image_url,
-            ]);
-            throw new SocialMediaException('Failed to share image to YouTube: ' . $e->getMessage());
-        }
+    public function shareText(string $caption): array {
+        throw new SocialMediaException('YouTube API does not support creating text posts (Community Tab access is restricted).');
     }
 
     /**
-     * Share a video post with a caption to YouTube.
-     *
-     * @param string $caption The caption to accompany the video.
-     * @param string $video_url The URL of the video.
-     * @return array Response from the YouTube API.
-     * @throws SocialMediaException
+     * Share Image (Not Supported).
      */
-    public function shareVideo(string $caption, string $video_url): array
-    {
-        $this->validateInput($caption, $video_url);
-        
-        try {
-            // Step 1: Upload video metadata
-            $metadata = [
-                'snippet' => [
-                    'title' => $this->extractTitleFromCaption($caption),
-                    'description' => $caption,
-                    'tags' => $this->extractTagsFromCaption($caption),
-                    'categoryId' => '22' // People & Blogs category
-                ],
-                'status' => [
-                    'privacyStatus' => 'public'
-                ]
-            ];
+    public function shareImage(string $caption, string $imageUrl): array {
+        throw new SocialMediaException('YouTube API does not support image uploads.');
+    }
 
-            // Step 2: Upload video file
-            $videoContent = file_get_contents($video_url);
-            if ($videoContent === false) {
-                throw new SocialMediaException('Failed to download video from URL: ' . $video_url);
+    /**
+     * Share URL (Not Supported).
+     */
+    public function shareUrl(string $caption, string $url): array {
+        throw new SocialMediaException('YouTube API does not support URL sharing directly. Upload a video instead.');
+    }
+
+    /* --------------------------------------------------------------------------
+     * READ METHODS
+     * -------------------------------------------------------------------------- */
+
+    /**
+     * Get Channel Info (Mine).
+     *
+     * @return array
+     */
+    public function getChannelInfo(): array {
+        return $this->sendRequest('get', 'channels', [
+            'part' => 'snippet,statistics,contentDetails',
+            'mine' => 'true'
+        ]);
+    }
+
+    /* --------------------------------------------------------------------------
+     * RESUMABLE UPLOAD LOGIC
+     * -------------------------------------------------------------------------- */
+
+    /**
+     * Step 1: Initialize Upload Session.
+     */
+    private function initResumableUpload(string $title, string $description): string {
+        $metadata = [
+            'snippet' => [
+                'title' => $title,
+                'description' => $description,
+                'categoryId' => '22' // People & Blogs
+            ],
+            'status' => [
+                'privacyStatus' => 'public' // or 'private', 'unlisted'
+            ]
+        ];
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $this->accessToken,
+            'X-Upload-Content-Type' => 'video/mp4',
+            'Content-Type' => 'application/json'
+        ])->post(self::UPLOAD_URL . '/videos?uploadType=resumable&part=snippet,status', $metadata);
+
+        if (!$response->successful()) {
+            throw new SocialMediaException("YouTube Upload Init Failed: " . $response->body());
+        }
+
+        $sessionUrl = $response->header('Location');
+
+        if (!$sessionUrl) {
+            throw new SocialMediaException("YouTube Upload Init Failed: No Location Header received.");
+        }
+
+        return $sessionUrl;
+    }
+
+    /**
+     * Step 2: Upload Binary Data in Chunks.
+     */
+    private function performResumableUpload(string $sessionUrl, string $filePath): array {
+        $fileSize = filesize($filePath);
+        $handle = fopen($filePath, 'rb');
+        $chunkSize = 5 * 1024 * 1024; // 5MB Chunks (Must be multiple of 256KB)
+        $offset = 0;
+
+        while (!feof($handle)) {
+            $chunk = fread($handle, $chunkSize);
+            $bytesRead = strlen($chunk);
+            $end = $offset + $bytesRead - 1;
+
+            $response = Http::withHeaders([
+                'Content-Length' => $bytesRead,
+                'Content-Range' => "bytes {$offset}-{$end}/{$fileSize}"
+            ])->put($sessionUrl, $chunk);
+
+            // 308 Resume Incomplete means "Chunk received, keep going"
+            if ($response->status() !== 308 && !$response->successful()) {
+                fclose($handle);
+                throw new SocialMediaException("YouTube Upload Chunk Failed: " . $response->body());
             }
 
-            $uploadUrl = $this->buildApiUrl('videos');
-            $response = $this->uploadVideo($uploadUrl, $metadata, $videoContent);
-            
-            $this->log('info', 'YouTube video post shared successfully', [
-                'platform' => 'youtube',
-                'video_id' => $response['id'] ?? null,
-                'channel_id' => $this->channel_id,
-                'title_length' => strlen($title),
-            ]);
-            return $response;
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to share video to YouTube', [
-                'platform' => 'youtube',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'channel_id' => $this->channel_id,
-                'video_url' => $video_url,
-            ]);
-            throw new SocialMediaException('Failed to share video to YouTube: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Create a community post on YouTube.
-     *
-     * @param string $text The text content.
-     * @param string $url The URL to share.
-     * @param string $type The type of content (text, image, etc.).
-     * @return array Response from the YouTube API.
-     * @throws SocialMediaException
-     */
-    public function createCommunityPost(string $text, string $url, string $type = 'text'): array
-    {
-        try {
-            $postUrl = $this->buildApiUrl('activities');
-            $params = [
-                'part' => 'snippet',
-                'snippet' => [
-                    'channelId' => $this->channel_id,
-                    'type' => 'post',
-                    'contentDetails' => [
-                        'communityPost' => [
-                            'text' => $text . ' ' . $url
-                        ]
-                    ]
-                ]
-            ];
-
-            $response = $this->sendRequest($postUrl, 'post', $params);
-            $this->log('info', 'YouTube community post created successfully', [
-                'platform' => 'youtube',
-                'post_id' => $response['id'] ?? null,
-                'channel_id' => $this->channel_id,
-            ]);
-            return $response;
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to create YouTube community post', [
-                'platform' => 'youtube',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'channel_id' => $this->channel_id,
-            ]);
-            throw new SocialMediaException('Failed to create YouTube community post: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Upload a video to YouTube.
-     *
-     * @param string $uploadUrl The YouTube upload URL.
-     * @param array $metadata The video metadata.
-     * @param string $videoContent The video content.
-     * @return array Response from the YouTube API.
-     * @throws SocialMediaException
-     */
-    private function uploadVideo(string $uploadUrl, array $metadata, string $videoContent): array
-    {
-        $boundary = uniqid();
-        $delimiter = '-------------' . $boundary;
-        
-        $postData = '';
-        $postData .= "--" . $delimiter . "\r\n";
-        $postData .= 'Content-Disposition: form-data; name="metadata"' . "\r\n";
-        $postData .= 'Content-Type: application/json; charset=UTF-8' . "\r\n";
-        $postData .= "\r\n";
-        $postData .= json_encode($metadata) . "\r\n";
-        $postData .= "--" . $delimiter . "\r\n";
-        $postData .= 'Content-Disposition: form-data; name="video"; filename="video.mp4"' . "\r\n";
-        $postData .= 'Content-Type: video/mp4' . "\r\n";
-        $postData .= "\r\n";
-        $postData .= $videoContent . "\r\n";
-        $postData .= "--" . $delimiter . "--\r\n";
-
-        $response = \Illuminate\Support\Facades\Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->access_token,
-            'Content-Type' => 'multipart/related; boundary=' . $delimiter,
-            'Content-Length' => strlen($postData)
-        ])->post($uploadUrl, $postData);
-
-        if (!$response->successful()) {
-            $errorData = $response->json();
-            $errorMessage = $errorData['error']['message'] ?? 'Unknown error occurred';
-            throw new SocialMediaException("YouTube API error: {$errorMessage}");
+            $offset += $bytesRead;
         }
 
+        fclose($handle);
+
+        // Final response contains the video data
         return $response->json();
     }
 
-    /**
-     * Get channel information.
-     *
-     * @return array Response from the YouTube API.
-     * @throws SocialMediaException
-     */
-    public function getChannelInfo(): array
-    {
-        try {
-            $url = $this->buildApiUrl('channels');
-            $params = [
-                'part' => 'snippet,statistics,contentDetails',
-                'id' => $this->channel_id,
-                'key' => $this->api_key
-            ];
-
-            return $this->sendRequest($url, 'get', $params);
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to get YouTube channel info', [
-                'platform' => 'youtube',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'channel_id' => $this->channel_id,
-            ]);
-            throw new SocialMediaException('Failed to get YouTube channel info: ' . $e->getMessage());
-        }
-    }
+    /* --------------------------------------------------------------------------
+     * INTERNAL HELPERS
+     * -------------------------------------------------------------------------- */
 
     /**
-     * Get channel's videos.
-     *
-     * @param int $maxResults Maximum number of videos to retrieve.
-     * @return array Response from the YouTube API.
-     * @throws SocialMediaException
+     * Send Request.
      */
-    public function getChannelVideos(int $maxResults = 25): array
-    {
-        try {
-            $url = $this->buildApiUrl('search');
-            $params = [
-                'part' => 'snippet',
-                'channelId' => $this->channel_id,
-                'type' => 'video',
-                'order' => 'date',
-                'maxResults' => min($maxResults, 50),
-                'key' => $this->api_key
-            ];
+    protected function sendRequest(string $method, string $endpoint, array $params = [], array $headers = []): array {
+        $url = self::API_BASE_URL . '/' . $endpoint;
+        $headers['Authorization'] = 'Bearer ' . $this->accessToken;
 
-            return $this->sendRequest($url, 'get', $params);
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to get YouTube channel videos', [
-                'platform' => 'youtube',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'channel_id' => $this->channel_id,
-                'limit' => $limit,
-            ]);
-            throw new SocialMediaException('Failed to get YouTube channel videos: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Get video analytics.
-     *
-     * @param string $videoId The YouTube video ID.
-     * @return array Response from the YouTube API.
-     * @throws SocialMediaException
-     */
-    public function getVideoAnalytics(string $videoId): array
-    {
-        try {
-            $url = $this->buildApiUrl('videos');
-            $params = [
-                'part' => 'statistics,snippet',
-                'id' => $videoId,
-                'key' => $this->api_key
-            ];
-
-            return $this->sendRequest($url, 'get', $params);
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to get YouTube video analytics', [
-                'platform' => 'youtube',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'video_id' => $videoId,
-            ]);
-            throw new SocialMediaException('Failed to get YouTube video analytics: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Extract title from caption.
-     *
-     * @param string $caption The caption text.
-     * @return string The extracted title.
-     */
-    private function extractTitleFromCaption(string $caption): string
-    {
-        $lines = explode("\n", $caption);
-        $title = trim($lines[0]);
-        
-        // Limit title to 100 characters (YouTube limit)
-        if (strlen($title) > 100) {
-            $title = substr($title, 0, 97) . '...';
-        }
-        
-        return $title ?: 'Shared Video';
-    }
-
-    /**
-     * Extract tags from caption.
-     *
-     * @param string $caption The caption text.
-     * @return array Array of tags.
-     */
-    private function extractTagsFromCaption(string $caption): array
-    {
-        // Simple tag extraction - look for words starting with #
-        preg_match_all('/#(\w+)/', $caption, $matches);
-        $tags = $matches[1] ?? [];
-        
-        // Limit to 15 tags (YouTube limit)
-        return array_slice($tags, 0, 15);
-    }
-
-    /**
-     * Validate input parameters.
-     *
-     * @param string $caption The caption text.
-     * @param string $url The URL.
-     * @throws SocialMediaException
-     */
-    private function validateInput(string $caption, string $url): void
-    {
-        if (empty(trim($caption))) {
-            throw new SocialMediaException('Caption cannot be empty.');
-        }
-
-        if (!filter_var($url, FILTER_VALIDATE_URL)) {
-            throw new SocialMediaException('Invalid URL provided.');
-        }
-    }
-
-    /**
-     * Build YouTube API URL.
-     *
-     * @param string $endpoint The API endpoint.
-     * @return string Complete API URL.
-     */
-    private function buildApiUrl(string $endpoint): string
-    {
-        return self::API_BASE_URL . '/' . $endpoint;
-    }
-
-    /**
-     * Send authenticated request to YouTube API.
-     *
-     * @param string $url The API URL.
-     * @param string $method The HTTP method.
-     * @param array $params The request parameters.
-     * @return array Response from the API.
-     * @throws SocialMediaException
-     */
-    protected function sendRequest(string $url, string $method = 'post', array $params = [], array $headers = []): array
-    {
-        $defaultHeaders = [
-            'Authorization' => 'Bearer ' . $this->access_token,
-            'Content-Type' => 'application/json'
-        ];
-        
-        $headers = array_merge($defaultHeaders, $headers);
-
-        $response = \Illuminate\Support\Facades\Http::withHeaders($headers)
-            ->{$method}($url, $params);
-
-        if (!$response->successful()) {
-            $errorData = $response->json();
-            $errorMessage = $errorData['error']['message'] ?? 'Unknown error occurred';
-            throw new SocialMediaException("YouTube API error: {$errorMessage}");
-        }
-
-        return $response->json();
+        return parent::sendRequest($method, $url, $params, $headers);
     }
 }

@@ -1,9 +1,38 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to the **Laravel Social Media Publisher** package will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [2.1.0] - 2025-11-22
+
+### 🚀 Added
+- **Polymorphic Relationships:** Introduced `SocialMediaConnection` model allowing `User`, `Company`, or any model to own connections via the `owner_id` and `owner_type` columns.
+- **Unified Facade:** Added `SocialMedia` facade for bulk publishing across multiple platforms simultaneously.
+- **Trait:** Added `HasSocialMediaConnections` trait for easy integration with Eloquent models.
+- **YouTube Support:** Added `YouTubeService` with **Resumable Upload Protocol** for handling large video files reliably.
+- **TikTok Support:** Added `TikTokService` utilizing the new **TikTok API v2** for direct video publishing.
+- **Pinterest Support:** Added `PinterestService` using **API v5**, supporting Pins and Boards.
+- **Telegram Support:** Added `TelegramService` for Bot API integration (Channels/Groups) with file support.
+- **Retry Logic:** Implemented generic `SocialMediaService` base class with automatic exponential backoff retry logic for failed API requests.
+- **Temp File Handling:** Added secure handling for remote file URLs (S3/CDN) by downloading to temporary local storage before uploading to APIs that require binary streams.
+
+### ⚡ Changed
+- **Twitter Rebranding:** Renamed `Twitter` facade to `X`. Updated authentication to use **OAuth 2.0 with PKCE** by default.
+- **LinkedIn Architecture:** Refactored `LinkedInService` to unify Profile and Company Page logic. The "Author URN" is now determined at instantiation time.
+- **Facebook/Instagram Logic:** Updated to Graph API **v20.0**. Added logic to fetch specific "Page Access Tokens" rather than posting as a user on a page.
+- **Instagram Publishing:** Added "Status Polling" to `shareVideo` and `shareCarousel`. The system now waits for the media container to be `FINISHED` before attempting to publish.
+- **Exceptions:** Standardized all exceptions to throw `SocialMediaException` with unified error messaging.
+
+### 🐛 Fixed
+- Fixed issue where Instagram Video uploads would fail if published immediately before transcoding was complete.
+- Fixed large video upload failures on X (Twitter) by implementing chunked media upload (INIT/APPEND/FINALIZE).
+- Fixed issue where Facebook Page Tokens were not being saved correctly during the OAuth callback.
+
+### 🔒 Security
+- Enforced PKCE (Proof Key for Code Exchange) for Twitter and LinkedIn OAuth flows.
+- Access Tokens and Refresh Tokens are now encrypted at rest in the database using Laravel's `Crypt` facade.
 
 ## [2.0.5] - 2025-11-14
 

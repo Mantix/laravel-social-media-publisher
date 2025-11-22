@@ -6,213 +6,140 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 
-abstract class SocialMediaService
-{
+abstract class SocialMediaService {
     /**
-     * Check if logging is enabled.
+     * Helper to log messages based on config configuration.
      *
-     * @return bool
+     * @param string $level
+     * @param string $message
+     * @param array $context
      */
-    protected function isLoggingEnabled(): bool
-    {
-        return config('social_media_publisher.enable_logging', true);
-    }
-
-    /**
-     * Log a message if logging is enabled.
-     *
-     * @param string $level The log level (info, warning, error, debug).
-     * @param string $message The log message.
-     * @param array $context Additional context data.
-     * @return void
-     */
-    protected function log(string $level, string $message, array $context = []): void
-    {
-        if (!$this->isLoggingEnabled()) {
-            return;
+    protected function log(string $level, string $message, array $context = []): void {
+        if (config('social_media_publisher.enable_logging', true)) {
+            Log::log($level, $message, $context);
         }
-
-        Log::{$level}($message, $context);
     }
 
     /**
-     * Send HTTP request with error handling and retry logic.
+     * Send an HTTP request with built-in retry logic and standardized error handling.
      *
-     * @param string $url The request URL.
-     * @param string $method The HTTP method.
-     * @param array $params The request parameters.
-     * @param array $headers Additional headers.
-     * @return array Response data.
+     * @param string $method get, post, put, delete
+     * @param string $url Full URL
+     * @param array $params Query parameters or Body fields
+     * @param array $headers Additional headers
+     * @return array
      * @throws SocialMediaException
      */
-    protected function sendRequest(string $url, string $method = 'post', array $params = [], array $headers = []): array
-    {
-        $maxRetries = config('social_media_publisher.retry_attempts', 3);
-        $timeout = config('social_media_publisher.timeout', 30);
-        
-        $this->log('debug', 'Initiating social media API request', [
-            'url' => $url,
-            'method' => strtoupper($method),
-            'has_params' => !empty($params),
-            'has_headers' => !empty($headers),
+    protected function sendRequest(string $method, string $url, array $params = [], array $headers = []): array {
+        $maxRetries = (int) config('social_media_publisher.retry_attempts', 3);
+        $timeout = (int) config('social_media_publisher.timeout', 60);
+        $sleepMs = 1000; // Wait 1s between retries (exponential backoff handled by Laravel/Guzzle usually)
+
+        $this->log('debug', "API Request: [{$method}] {$url}", [
+            'params_count' => count($params),
         ]);
-        
-        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
-            try {
-                $response = Http::timeout($timeout)
-                    ->withHeaders($headers)
-                    ->{$method}($url, $params);
 
-                if (!$response->successful()) {
-                    $errorMessage = $this->extractErrorMessage($response);
-                    
-                    if ($attempt === $maxRetries) {
-                        $this->log('error', 'Social media API request failed after all retries', [
-                            'url' => $url,
-                            'method' => strtoupper($method),
-                            'status' => $response->status(),
-                            'error' => $errorMessage,
-                            'attempts' => $attempt,
-                            'response_body' => $response->body(),
-                        ]);
-                        
-                        throw new SocialMediaException("API request failed: {$errorMessage}");
-                    }
-                    
-                    $this->log('warning', 'Social media API request failed, retrying', [
-                        'url' => $url,
-                        'status' => $response->status(),
-                        'error' => $errorMessage,
-                        'attempt' => $attempt,
-                        'max_attempts' => $maxRetries,
-                    ]);
-                    
-                    // Wait before retry (exponential backoff)
-                    sleep(pow(2, $attempt - 1));
-                    continue;
-                }
+        try {
+            // Use Laravel's built-in retry mechanism
+            $response = Http::timeout($timeout)
+                ->retry($maxRetries, $sleepMs, function ($exception, $request) {
+                    return $exception instanceof \Illuminate\Http\Client\ConnectionException ||
+                        $exception->response->status() >= 500 ||
+                        $exception->response->status() === 429;
+                })
+                ->withHeaders($headers)
+                ->$method($url, $params);
 
-                $data = $response->json();
-                
-                $this->log('info', 'Social media API request successful', [
-                    'url' => $url,
-                    'method' => strtoupper($method),
-                    'status' => $response->status(),
-                    'attempt' => $attempt,
-                ]);
-                
-                return $data;
-                
-            } catch (\Exception $e) {
-                if ($attempt === $maxRetries) {
-                    $this->log('error', 'Social media API request failed with exception', [
-                        'url' => $url,
-                        'method' => strtoupper($method),
-                        'error' => $e->getMessage(),
-                        'exception' => get_class($e),
-                        'attempts' => $attempt,
-                        'trace' => $e->getTraceAsString(),
-                    ]);
-                    
-                    throw new SocialMediaException("Request failed: " . $e->getMessage());
-                }
-                
-                $this->log('warning', 'Social media API request failed with exception, retrying', [
-                    'url' => $url,
-                    'error' => $e->getMessage(),
-                    'exception' => get_class($e),
-                    'attempt' => $attempt,
-                    'max_attempts' => $maxRetries,
-                ]);
-                
-                // Wait before retry
-                sleep(pow(2, $attempt - 1));
+            // Throw exception for 400/500 errors
+            if (!$response->successful()) {
+                $this->handleRequestError($response, $url);
             }
+
+            return $response->json() ?? [];
+        } catch (\Exception $e) {
+            // If it's already our custom exception, rethrow it
+            if ($e instanceof SocialMediaException) {
+                throw $e;
+            }
+
+            // Log unexpected errors (connection issues, etc)
+            $this->log('error', "API Connection Failed: {$url}", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            throw new SocialMediaException("Connection failed: " . $e->getMessage());
         }
-        
-        throw new SocialMediaException('Request failed after all retry attempts');
     }
 
     /**
-     * Extract error message from response.
-     *
-     * @param \Illuminate\Http\Client\Response $response The HTTP response.
-     * @return string The error message.
-     */
-    private function extractErrorMessage($response): string
-    {
-        $data = $response->json();
-        
-        if (isset($data['error']['message'])) {
-            return $data['error']['message'];
-        }
-        
-        if (isset($data['message'])) {
-            return $data['message'];
-        }
-        
-        if (isset($data['error'])) {
-            return is_string($data['error']) ? $data['error'] : json_encode($data['error']);
-        }
-        
-        return "HTTP {$response->status()}: {$response->body()}";
-    }
-
-    /**
-     * Validate URL format.
-     *
-     * @param string $url The URL to validate.
+     * Handle API errors and throw standardized exception.
+     * * @param \Illuminate\Http\Client\Response $response
+     * @param string $url
      * @throws SocialMediaException
      */
-    protected function validateUrl(string $url): void
-    {
-        if (!filter_var($url, FILTER_VALIDATE_URL)) {
-            throw new SocialMediaException('Invalid URL provided: ' . $url);
-        }
-    }
+    protected function handleRequestError($response, string $url): void {
+        $status = $response->status();
+        $body = $response->json();
 
-    /**
-     * Validate text content.
-     *
-     * @param string $text The text to validate.
-     * @param int $maxLength Maximum allowed length.
-     * @throws SocialMediaException
-     */
-    protected function validateText(string $text, int $maxLength = 1000): void
-    {
-        if (empty(trim($text))) {
-            throw new SocialMediaException('Text content cannot be empty.');
-        }
-        
-        if (strlen($text) > $maxLength) {
-            throw new SocialMediaException("Text content exceeds maximum length of {$maxLength} characters.");
-        }
-    }
+        // Attempt to extract a readable message from various API standards
+        $message = $body['error']['message']
+            ?? $body['message']
+            ?? $body['error_description']
+            ?? $response->body();
 
-    /**
-     * Download file from URL with error handling.
-     *
-     * @param string $url The file URL.
-     * @return string The downloaded file content.
-     * @throws SocialMediaException
-     */
-    protected function downloadFile(string $url): string
-    {
-        $this->validateUrl($url);
-        
-        $context = stream_context_create([
-            'http' => [
-                'timeout' => config('social_media_publisher.timeout', 30),
-                'user_agent' => 'Laravel Social Media Publisher Package'
-            ]
+        // Recursively clean message if it is an array
+        if (is_array($message)) {
+            $message = json_encode($message);
+        }
+
+        $this->log('error', "API Error {$status}: {$url}", [
+            'response' => $body
         ]);
-        
-        $content = file_get_contents($url, false, $context);
-        
-        if ($content === false) {
-            throw new SocialMediaException('Failed to download file from URL: ' . $url);
+
+        throw new SocialMediaException("API Error ({$status}): {$message}");
+    }
+
+    /**
+     * Validate and download a remote file to a temporary local path.
+     * Useful for Video Uploads that require a file stream.
+     *
+     * @param string $url
+     * @return string Path to the temporary file
+     * @throws SocialMediaException
+     */
+    protected function getTemporaryFilePath(string $url): string {
+        if (!filter_var($url, FILTER_VALIDATE_URL)) {
+            // If it's not a URL, assume it's already a local path and validate existence
+            if (file_exists($url)) {
+                return $url;
+            }
+            throw new SocialMediaException("Invalid file URL or path: {$url}");
         }
-        
-        return $content;
+
+        try {
+            $content = Http::timeout(60)->get($url)->throw()->body();
+
+            // Create a temp file
+            $tempPath = tempnam(sys_get_temp_dir(), 'social_media_upload_');
+            file_put_contents($tempPath, $content);
+
+            return $tempPath;
+        } catch (\Exception $e) {
+            throw new SocialMediaException("Failed to download file from {$url}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Validate text length helper.
+     *
+     * @param string $text
+     * @param int $max
+     * @throws SocialMediaException
+     */
+    protected function validateText(string $text, int $max): void {
+        if (mb_strlen($text) > $max) {
+            throw new SocialMediaException("Caption exceeds maximum length of {$max} characters.");
+        }
     }
 }

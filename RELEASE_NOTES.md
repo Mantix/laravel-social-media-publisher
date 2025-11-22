@@ -1,5 +1,67 @@
 # Release Notes
 
+# Release Notes
+
+## v2.1.0 - The "Omnichannel" Release 🚀
+
+We are thrilled to announce the official release of **Laravel Social Media Publisher v2.1.0**. This package has been re-architected from the ground up to provide a robust, production-ready solution for managing social media across the Laravel ecosystem.
+
+### 🌟 Highlights
+
+#### 1. True Multi-Tenant & Polymorphic Support
+Gone are the days of single-account connections. You can now attach social media connections to **any Eloquent model**.
+- Users can connect their personal profiles.
+- Companies can connect their business pages.
+- Your application can manage infinite connections per user.
+
+#### 2. Robust Media Handling
+We have implemented platform-specific upload protocols to ensure large files handle correctly:
+- **YouTube:** Implemented Resumable Upload Protocol for large video files.
+- **Twitter/X:** Implemented Chunked Upload (INIT -> APPEND -> FINALIZE) for videos.
+- **TikTok:** Implemented binary stream uploading via API v2.
+- **Instagram:** Implemented Container Status Polling to handle asynchronous media processing.
+
+#### 3. Modern OAuth 2.0 Security
+Security is paramount. We have standardized authentication flows:
+- **PKCE Support:** Enabled by default for Twitter/X and LinkedIn.
+- **Token Management:** Automatic handling of Long-Lived tokens (Facebook/Instagram) and Refresh Tokens (LinkedIn/X).
+- **Bot Integration:** Seamless integration for Telegram Bot API.
+
+#### 4. Unified & Specific APIs
+- **Unified:** Use `SocialMedia::shareVideo($user, ['youtube', 'tiktok'], ...)` to post everywhere at once.
+- **Specific:** Use `YouTube::forConnection($conn)->getVideoAnalytics(...)` to dig deep into platform data.
+
+---
+
+### 📦 Platform Support Overview
+
+| Platform | API Version | Key Features Supported |
+|----------|-------------|------------------------|
+| **Facebook** | Graph v20.0 | Page Publishing, Insights, Long-lived Tokens |
+| **X (Twitter)** | API v2 | Tweets, Polls, Threads, Chunked Video Uploads |
+| **LinkedIn** | v2 | Profile & Company Pages, Rich Media |
+| **Instagram** | Graph v20.0 | Feed Posts, Stories, Carousels, Analytics |
+| **TikTok** | Display v2 | Video Publishing, User Stats |
+| **YouTube** | Data API v3 | Resumable Video Uploads, Channel Stats |
+| **Pinterest** | API v5 | Pins, Boards, Analytics |
+| **Telegram** | Bot API | Channel/Group Messaging, Documents, Media |
+
+---
+
+### 🛠 Upgrade Guide
+
+If you were using a dev-master or alpha version of this package, please note the following breaking changes:
+
+1.  **Twitter Facade Renamed**: The `Twitter` facade has been renamed to `X` to reflect branding changes.
+2.  **Service Instantiation**: Services can no longer be instantiated directly. You must use `SocialMedia::platform()` or `Service::forConnection()`.
+3.  **Database Schema**: Ensure you have run the latest migrations to create the `social_media_connections` polymorphic table.
+
+### ❤️ Acknowledgements
+
+Thank you to all contributors who helped test the various API endpoints and OAuth flows.
+
+---
+
 ## 🎉 Laravel Social Media Publisher v2.0.5 - Fixed some typo's
 
 **Release Date**: November 14, 2025  

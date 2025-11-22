@@ -7,20 +7,17 @@ use Illuminate\Support\Facades\Facade;
 /**
  * Class YouTube
  *
- * @method static mixed shareUrl(string $caption, string $url)
- * @method static mixed shareImage(string $caption, string $image_url)
- * @method static mixed shareVideo(string $caption, string $video_url)
- * @method static mixed createCommunityPost(string $text, string $url, string $type = 'text')
- * @method static mixed getChannelInfo()
- * @method static mixed getChannelVideos(int $maxResults = 25)
- * @method static mixed getVideoAnalytics(string $videoId)
+ * Facade for the YouTubeService.
  *
- * @see \mantix\LaravelSocialMediaPublisher\Services\YouTubeService
+ * @method static string getAuthorizationUrl(string $redirectUri, array $scopes = [], ?string $state = null)
+ * @method static array handleCallback(string $code, string $redirectUri)
+ * @method static array refreshAccessToken(string $refreshToken)
+ * @method static \Mantix\LaravelSocialMediaPublisher\Services\YouTubeService forConnection(\Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection)
+ *
+ * @see \Mantix\LaravelSocialMediaPublisher\Services\YouTubeService
  */
-class YouTube extends Facade
-{
-    protected static function getFacadeAccessor()
-    {
-        return \mantix\LaravelSocialMediaPublisher\Services\YouTubeService::class;
+class YouTube extends Facade {
+    protected static function getFacadeAccessor() {
+        return \Mantix\LaravelSocialMediaPublisher\Services\YouTubeService::class;
     }
 }

@@ -2,191 +2,174 @@
 
 namespace Mantix\LaravelSocialMediaPublisher\Services;
 
-use Mantix\LaravelSocialMediaPublisher\Contracts\ShareImagePostInterface;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Mantix\LaravelSocialMediaPublisher\Contracts\ShareInterface;
 use Mantix\LaravelSocialMediaPublisher\Contracts\ShareVideoPostInterface;
 use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
-use Illuminate\Support\Facades\Log;
+use Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 
 /**
  * Class TikTokService
  *
- * Service for managing and publishing content to TikTok using the TikTok for Developers API.
+ * Service for managing and publishing content to TikTok using the TikTok Display API v2.
  *
- * Implements sharing of videos to TikTok.
+ * @package Mantix\LaravelSocialMediaPublisher\Services
  */
-class TikTokService extends SocialMediaService implements ShareInterface, ShareImagePostInterface, ShareVideoPostInterface
-{
-    /**
-     * @var string TikTok Access Token
-     */
-    private $access_token;
+class TikTokService extends SocialMediaService implements ShareInterface, ShareVideoPostInterface {
+    /** @var string TikTok Access Token */
+    private string $accessToken;
+
+    /** @var string TikTok API base URL (v2) */
+    private const API_BASE_URL = 'https://open.tiktokapis.com/v2';
 
     /**
-     * @var string TikTok Client Key
+     * TikTokService constructor.
+     *
+     * @param string $accessToken
      */
-    private $client_key;
-
-    /**
-     * @var string TikTok Client Secret
-     */
-    private $client_secret;
-
-    /**
-     * @var TikTokService|null Singleton instance
-     */
-    private static ?TikTokService $instance = null;
-
-    /**
-     * TikTok API base URL
-     */
-    private const API_BASE_URL = 'https://open-api.tiktok.com';
-
-    /**
-     * Private constructor to prevent direct instantiation.
-     */
-    private function __construct(
-        string $accessToken,
-        string $clientKey,
-        string $clientSecret
-    ) {
-        $this->access_token = $accessToken;
-        $this->client_key = $clientKey;
-        $this->client_secret = $clientSecret;
-    }
-
-    /**
-     * Get instance - OAuth connection required.
-     * 
-     * @return TikTokService
-     * @throws SocialMediaException
-     * @deprecated Use forConnection() with a SocialMediaConnection instead
-     */
-    public static function getInstance(): TikTokService
-    {
-        throw new SocialMediaException('OAuth connection required. Please use forConnection() with a SocialMediaConnection or authenticate via OAuth first.');
+    public function __construct(string $accessToken) {
+        $this->accessToken = $accessToken;
     }
 
     /**
      * Create a new instance from a SocialMediaConnection.
      *
-     * @param \mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection
-     * @return TikTokService
+     * @param SocialMediaConnection $connection
+     * @return self
      * @throws SocialMediaException
      */
-    public static function forConnection(\mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection): TikTokService
-    {
+    public static function forConnection(SocialMediaConnection $connection): self {
         if ($connection->platform !== 'tiktok') {
-            throw new SocialMediaException('Connection is not for TikTok platform.');
+            throw new SocialMediaException('Connection is not for the TikTok platform.');
         }
 
         $accessToken = $connection->getDecryptedAccessToken();
-        $metadata = $connection->metadata ?? [];
-        $clientKey = $metadata['client_key'] ?? config('social_media_publisher.tiktok_client_id');
-        $clientSecret = $metadata['client_secret'] ?? config('social_media_publisher.tiktok_client_secret');
 
-        if (!$accessToken || !$clientKey || !$clientSecret) {
+        if (!$accessToken) {
             throw new SocialMediaException('TikTok connection is missing required credentials.');
         }
 
-        return new self($accessToken, $clientKey, $clientSecret);
+        return new self($accessToken);
     }
 
+    /* --------------------------------------------------------------------------
+     * AUTHENTICATION
+     * -------------------------------------------------------------------------- */
+
     /**
-     * Share a text post with a URL to TikTok.
-     * Note: TikTok doesn't support direct text posts, so this creates a video with text overlay.
+     * Get the Authorization URL.
      *
-     * @param string $caption The text content of the post.
-     * @param string $url The URL to share.
-     * @return array Response from the TikTok API.
-     * @throws SocialMediaException
+     * @param string $redirectUri
+     * @param array $scopes
+     * @param string|null $state
+     * @return string
      */
-    public function shareUrl(string $caption, string $url): array
-    {
-        $this->validateInput($caption, $url);
-        
-        try {
-            // TikTok doesn't support direct text posts
-            // We'll create a simple video with text overlay
-            $videoUrl = $this->createTextVideo($caption, $url);
-            return $this->shareVideo($caption, $videoUrl);
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to share to TikTok', [
-                'platform' => 'tiktok',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'url' => $url,
-            ]);
-            throw new SocialMediaException('Failed to share to TikTok: ' . $e->getMessage());
+    public static function getAuthorizationUrl(
+        string $redirectUri,
+        array $scopes = ['user.info.basic', 'video.publish', 'video.upload'],
+        ?string $state = null
+    ): string {
+        $clientKey = config('social_media_publisher.tiktok_client_id');
+
+        if (!$clientKey) {
+            throw new SocialMediaException('TikTok Client Key is not configured.');
         }
+
+        $state = $state ?? bin2hex(random_bytes(16));
+        $scopeString = implode(',', $scopes);
+
+        return sprintf(
+            'https://www.tiktok.com/v2/auth/authorize/?client_key=%s&response_type=code&scope=%s&redirect_uri=%s&state=%s',
+            urlencode($clientKey),
+            urlencode($scopeString),
+            urlencode($redirectUri),
+            urlencode($state)
+        );
     }
 
     /**
-     * Share an image post with a caption to TikTok.
-     * Note: TikTok doesn't support direct image posts, so this creates a video from the image.
+     * Handle OAuth Callback.
      *
-     * @param string $caption The caption to accompany the image.
-     * @param string $image_url The URL of the image.
-     * @return array Response from the TikTok API.
-     * @throws SocialMediaException
+     * @param string $code
+     * @param string $redirectUri
+     * @return array
      */
-    public function shareImage(string $caption, string $image_url): array
-    {
-        $this->validateInput($caption, $image_url);
-        
-        try {
-            // Convert image to video for TikTok
-            $videoUrl = $this->convertImageToVideo($image_url, $caption);
-            return $this->shareVideo($caption, $videoUrl);
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to share image to TikTok', [
-                'platform' => 'tiktok',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'image_url' => $image_url,
-            ]);
-            throw new SocialMediaException('Failed to share image to TikTok: ' . $e->getMessage());
+    public static function handleCallback(string $code, string $redirectUri): array {
+        $clientKey = config('social_media_publisher.tiktok_client_id');
+        $clientSecret = config('social_media_publisher.tiktok_client_secret');
+
+        $response = Http::asForm()->post(self::API_BASE_URL . '/oauth/token/', [
+            'client_key' => $clientKey,
+            'client_secret' => $clientSecret,
+            'code' => $code,
+            'grant_type' => 'authorization_code',
+            'redirect_uri' => $redirectUri,
+        ]);
+
+        if (!$response->successful()) {
+            throw new SocialMediaException('Failed to retrieve TikTok access token: ' . $response->body());
         }
+
+        $data = $response->json();
+
+        // Fetch basic profile info to identify the user
+        $tempService = new self($data['access_token']);
+        $profile = $tempService->getUserInfo();
+
+        return array_merge($data, ['profile' => $profile['data']['user'] ?? []]);
     }
 
     /**
-     * Share a video post with a caption to TikTok.
+     * Refresh Access Token.
      *
-     * @param string $caption The caption to accompany the video.
-     * @param string $video_url The URL of the video.
-     * @return array Response from the TikTok API.
-     * @throws SocialMediaException
+     * @param string $refreshToken
+     * @return array
      */
-    public function shareVideo(string $caption, string $video_url): array
-    {
-        $this->validateInput($caption, $video_url);
-        
+    public static function refreshAccessToken(string $refreshToken): array {
+        $clientKey = config('social_media_publisher.tiktok_client_id');
+        $clientSecret = config('social_media_publisher.tiktok_client_secret');
+
+        $response = Http::asForm()->post(self::API_BASE_URL . '/oauth/token/', [
+            'client_key' => $clientKey,
+            'client_secret' => $clientSecret,
+            'grant_type' => 'refresh_token',
+            'refresh_token' => $refreshToken,
+        ]);
+
+        if (!$response->successful()) {
+            throw new SocialMediaException('Failed to refresh TikTok token: ' . $response->body());
+        }
+
+        return $response->json();
+    }
+
+    /* --------------------------------------------------------------------------
+     * PUBLISHING METHODS
+     * -------------------------------------------------------------------------- */
+
+    /**
+     * Share a Video to TikTok.
+     * 
+     *
+     * @param string $caption
+     * @param string $videoUrl
+     * @return array
+     */
+    public function shareVideo(string $caption, string $videoUrl): array {
+        $this->validateText($caption, 2200);
+
+        // 1. Download video to a local temp file to ensure we can stream it securely
+        $localPath = $this->getTemporaryFilePath($videoUrl);
+        $fileSize = filesize($localPath);
+
         try {
-            // Step 1: Initialize upload
-            $initUrl = $this->buildApiUrl('share/video/upload/');
-            $initParams = [
-                'source_info' => [
-                    'source' => 'FILE_UPLOAD',
-                    'video_size' => $this->getVideoSize($video_url),
-                    'chunk_size' => 10485760, // 10MB chunks
-                    'total_chunk_count' => 1
-                ]
-            ];
-
-            $initResponse = $this->sendRequest($initUrl, 'post', $initParams);
-            $publishId = $initResponse['data']['publish_id'];
-
-            // Step 2: Upload video
-            $uploadUrl = $initResponse['data']['upload_url'];
-            $this->uploadVideoChunk($video_url, $uploadUrl);
-
-            // Step 3: Publish video
-            $publishUrl = $this->buildApiUrl('share/video/publish/');
-            $publishParams = [
+            // 2. Initialize Upload
+            // TikTok requires 'post_info' and 'source_info' structure
+            $initData = $this->sendRequest('post', 'post/publish/video/init/', [
                 'post_info' => [
                     'title' => $caption,
-                    'description' => $caption,
-                    'privacy_level' => 'MUTUAL_FOLLOW_FRIEND',
+                    'privacy_level' => 'PUBLIC_TO_EVERYONE', // Options: PUBLIC_TO_EVERYONE, MUTUAL_FOLLOW_FRIENDS, SELF_ONLY
                     'disable_duet' => false,
                     'disable_comment' => false,
                     'disable_stitch' => false,
@@ -194,215 +177,113 @@ class TikTokService extends SocialMediaService implements ShareInterface, ShareI
                 ],
                 'source_info' => [
                     'source' => 'FILE_UPLOAD',
-                    'video_size' => $this->getVideoSize($video_url),
-                    'chunk_size' => 10485760,
+                    'video_size' => $fileSize,
+                    'chunk_size' => $fileSize, // We upload in one chunk for simplicity (limit: 4GB usually)
                     'total_chunk_count' => 1
-                ],
-                'publish_id' => $publishId
-            ];
-
-            $response = $this->sendRequest($publishUrl, 'post', $publishParams);
-            $this->log('info', 'TikTok video post shared successfully', [
-                'platform' => 'tiktok',
-                'video_id' => $response['data']['video_id'] ?? null,
-                'caption_length' => strlen($caption),
+                ]
             ]);
-            return $response;
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to share video to TikTok', [
-                'platform' => 'tiktok',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'video_url' => $video_url,
-            ]);
-            throw new SocialMediaException('Failed to share video to TikTok: ' . $e->getMessage());
+
+            $uploadUrl = $initData['data']['upload_url'] ?? null;
+            $publishId = $initData['data']['publish_id'] ?? null;
+
+            if (!$uploadUrl || !$publishId) {
+                throw new SocialMediaException('TikTok Init failed: Missing upload URL or Publish ID.');
+            }
+
+            // 3. Perform the Upload (PUT Binary)
+            // Note: We use raw Http client here because we need to send raw binary body, not JSON
+            $uploadResponse = Http::withHeaders([
+                'Content-Type' => 'video/mp4',
+                'Content-Length' => $fileSize,
+                'Content-Range' => "bytes 0-" . ($fileSize - 1) . "/$fileSize"
+            ])->put($uploadUrl, fopen($localPath, 'r'));
+
+            if (!$uploadResponse->successful()) {
+                throw new SocialMediaException("TikTok Binary Upload Failed: " . $uploadResponse->body());
+            }
+
+            // 4. TikTok auto-publishes after the upload is complete for 'FILE_UPLOAD' source.
+            // We just return the publish ID reference.
+            $this->log('info', 'TikTok video uploaded successfully', ['publish_id' => $publishId]);
+
+            return ['publish_id' => $publishId];
+        } finally {
+            // Clean up temp file
+            if (file_exists($localPath)) {
+                @unlink($localPath);
+            }
         }
     }
 
     /**
-     * Get user profile information.
-     *
-     * @return array Response from the TikTok API.
-     * @throws SocialMediaException
+     * Share URL (Not Supported).
      */
-    public function getUserInfo(): array
-    {
-        try {
-            $url = $this->buildApiUrl('user/info/');
-            $params = [
-                'fields' => 'open_id,union_id,avatar_url,display_name,follower_count,following_count,likes_count,video_count'
-            ];
-
-            return $this->sendRequest($url, 'get', $params);
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to get TikTok user info', [
-                'platform' => 'tiktok',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-            ]);
-            throw new SocialMediaException('Failed to get TikTok user info: ' . $e->getMessage());
-        }
+    public function shareUrl(string $caption, string $url): array {
+        throw new SocialMediaException('TikTok does not support text/link posts. Please use shareVideo().');
     }
 
     /**
-     * Get user's videos.
-     *
-     * @param int $max_count Maximum number of videos to retrieve.
-     * @return array Response from the TikTok API.
-     * @throws SocialMediaException
+     * Share Image (Not Supported via API currently).
      */
-    public function getUserVideos(int $max_count = 20): array
-    {
-        try {
-            $url = $this->buildApiUrl('video/list/');
-            $params = [
-                'max_count' => min($max_count, 20),
-                'fields' => 'id,title,cover_image_url,share_url,embed_url,create_time'
-            ];
-
-            return $this->sendRequest($url, 'get', $params);
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to get TikTok user videos', [
-                'platform' => 'tiktok',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'limit' => $limit,
-            ]);
-            throw new SocialMediaException('Failed to get TikTok user videos: ' . $e->getMessage());
-        }
+    public function shareImage(string $caption, string $imageUrl): array {
+        throw new SocialMediaException('TikTok API currently only supports Video uploads. Image/Carousel support is limited.');
     }
 
     /**
-     * Create a text video for TikTok.
-     *
-     * @param string $text The text to display.
-     * @param string $url The URL to include.
-     * @return string The URL of the generated video.
-     * @throws SocialMediaException
+     * Share Text (Not Supported).
      */
-    private function createTextVideo(string $text, string $url): string
-    {
-        // This is a simplified implementation
-        // In a real scenario, you might want to use a service to generate videos with text
-        $videoText = $text . "\n\n" . $url;
-        
-        // For now, return a placeholder video URL
-        // In production, you should generate an actual video with the text
-        return 'https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4';
+    public function shareText(string $caption): array {
+        throw new SocialMediaException('TikTok does not support text-only posts.');
+    }
+
+    /* --------------------------------------------------------------------------
+     * READ METHODS
+     * -------------------------------------------------------------------------- */
+
+    /**
+     * Get User Info.
+     *
+     * @return array
+     */
+    public function getUserInfo(): array {
+        return $this->sendRequest('get', 'user/info/', [
+            'fields' => ['open_id', 'union_id', 'avatar_url', 'display_name', 'follower_count']
+        ]);
     }
 
     /**
-     * Convert image to video for TikTok.
+     * Get User Videos.
      *
-     * @param string $imageUrl The URL of the image.
-     * @param string $caption The caption text.
-     * @return string The URL of the generated video.
-     * @throws SocialMediaException
+     * @param int $maxCount
+     * @return array
      */
-    private function convertImageToVideo(string $imageUrl, string $caption): string
-    {
-        // This is a simplified implementation
-        // In a real scenario, you might want to use a service to convert images to videos
-        // For now, return a placeholder video URL
-        return 'https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4';
+    public function getUserVideos(int $maxCount = 20): array {
+        return $this->sendRequest('post', 'video/list/', [
+            'max_count' => min($maxCount, 20),
+            'fields' => ['id', 'title', 'cover_image_url', 'share_url', 'view_count']
+        ]);
     }
 
-    /**
-     * Get video file size.
-     *
-     * @param string $videoUrl The URL of the video.
-     * @return int The size of the video file in bytes.
-     * @throws SocialMediaException
-     */
-    private function getVideoSize(string $videoUrl): int
-    {
-        $headers = get_headers($videoUrl, 1);
-        if (!$headers || !isset($headers['Content-Length'])) {
-            throw new SocialMediaException('Could not determine video file size.');
-        }
-        
-        return (int) $headers['Content-Length'];
-    }
+    /* --------------------------------------------------------------------------
+     * INTERNAL HELPERS
+     * -------------------------------------------------------------------------- */
 
     /**
-     * Upload video chunk to TikTok.
-     *
-     * @param string $videoUrl The URL of the video.
-     * @param string $uploadUrl The TikTok upload URL.
-     * @throws SocialMediaException
+     * Send Request to TikTok API v2.
      */
-    private function uploadVideoChunk(string $videoUrl, string $uploadUrl): void
-    {
-        $videoContent = file_get_contents($videoUrl);
-        if ($videoContent === false) {
-            throw new SocialMediaException('Failed to download video from URL: ' . $videoUrl);
+    protected function sendRequest(string $method, string $endpoint, array $params = [], array $headers = []): array {
+        $url = self::API_BASE_URL . '/' . $endpoint;
+
+        $headers['Authorization'] = 'Bearer ' . $this->accessToken;
+        $headers['Content-Type'] = 'application/json';
+
+        $response = parent::sendRequest($method, $url, $params, $headers);
+
+        // TikTok wraps success in 'data' key, checks 'error' key inside body
+        if (isset($response['error']['code']) && $response['error']['code'] !== 'ok') {
+            throw new SocialMediaException("TikTok API Error: " . ($response['error']['message'] ?? 'Unknown'));
         }
 
-        $response = \Illuminate\Support\Facades\Http::withHeaders([
-            'Content-Type' => 'application/octet-stream'
-        ])->put($uploadUrl, $videoContent);
-
-        if (!$response->successful()) {
-            throw new SocialMediaException('Failed to upload video to TikTok');
-        }
-    }
-
-    /**
-     * Validate input parameters.
-     *
-     * @param string $caption The caption text.
-     * @param string $url The URL.
-     * @throws SocialMediaException
-     */
-    private function validateInput(string $caption, string $url): void
-    {
-        if (empty(trim($caption))) {
-            throw new SocialMediaException('Caption cannot be empty.');
-        }
-
-        if (!filter_var($url, FILTER_VALIDATE_URL)) {
-            throw new SocialMediaException('Invalid URL provided.');
-        }
-    }
-
-    /**
-     * Build TikTok API URL.
-     *
-     * @param string $endpoint The API endpoint.
-     * @return string Complete API URL.
-     */
-    private function buildApiUrl(string $endpoint): string
-    {
-        return self::API_BASE_URL . '/' . $endpoint;
-    }
-
-    /**
-     * Send authenticated request to TikTok API.
-     *
-     * @param string $url The API URL.
-     * @param string $method The HTTP method.
-     * @param array $params The request parameters.
-     * @return array Response from the API.
-     * @throws SocialMediaException
-     */
-    protected function sendRequest(string $url, string $method = 'post', array $params = [], array $headers = []): array
-    {
-        $defaultHeaders = [
-            'Authorization' => 'Bearer ' . $this->access_token,
-            'Content-Type' => 'application/json'
-        ];
-        
-        $headers = array_merge($defaultHeaders, $headers);
-
-        $response = \Illuminate\Support\Facades\Http::withHeaders($headers)
-            ->{$method}($url, $params);
-
-        if (!$response->successful()) {
-            $errorData = $response->json();
-            $errorMessage = $errorData['error']['message'] ?? 'Unknown error occurred';
-            throw new SocialMediaException("TikTok API error: {$errorMessage}");
-        }
-
-        return $response->json();
+        return $response;
     }
 }

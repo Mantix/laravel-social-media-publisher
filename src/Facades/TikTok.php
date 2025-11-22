@@ -7,18 +7,17 @@ use Illuminate\Support\Facades\Facade;
 /**
  * Class TikTok
  *
- * @method static mixed shareUrl(string $caption, string $url)
- * @method static mixed shareImage(string $caption, string $image_url)
- * @method static mixed shareVideo(string $caption, string $video_url)
- * @method static mixed getUserInfo()
- * @method static mixed getUserVideos(int $max_count = 20)
+ * Facade for the TikTokService.
  *
- * @see \mantix\LaravelSocialMediaPublisher\Services\TikTokService
+ * @method static string getAuthorizationUrl(string $redirectUri, array $scopes = [], ?string $state = null)
+ * @method static array handleCallback(string $code, string $redirectUri)
+ * @method static array refreshAccessToken(string $refreshToken)
+ * @method static \Mantix\LaravelSocialMediaPublisher\Services\TikTokService forConnection(\Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection)
+ *
+ * @see \Mantix\LaravelSocialMediaPublisher\Services\TikTokService
  */
-class TikTok extends Facade
-{
-    protected static function getFacadeAccessor()
-    {
-        return \mantix\LaravelSocialMediaPublisher\Services\TikTokService::class;
+class TikTok extends Facade {
+    protected static function getFacadeAccessor() {
+        return \Mantix\LaravelSocialMediaPublisher\Services\TikTokService::class;
     }
 }

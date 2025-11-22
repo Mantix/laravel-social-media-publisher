@@ -5,20 +5,19 @@ namespace Mantix\LaravelSocialMediaPublisher\Facades;
 use Illuminate\Support\Facades\Facade;
 
 /**
- * Class FaceBook
+ * Class Facebook
  *
- * @method static mixed shareUrl(string $caption, string $url)
- * @method static mixed shareText(string $caption)
- * @method static mixed shareImage(string $caption, string $image_url)
- * @method static mixed shareVideo(string $caption, string $video_url)
- * @method static mixed getPageInsights(array $metrics = [], array $additionalParams = [])
- * @method static mixed getPageInfo()
+ * Facade for the FacebookService.
+ * Acts as a factory to instantiate the service for a specific connection.
  *
- * @see \mantix\LaravelSocialMediaPublisher\Services\FacebookService
+ * @method static string getAuthorizationUrl(string $redirectUri, array $scopes = [], ?string $state = null)
+ * @method static array handleCallback(string $code, string $redirectUri)
+ * @method static \Mantix\LaravelSocialMediaPublisher\Services\FacebookService forConnection(\Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection)
+ *
+ * @see \Mantix\LaravelSocialMediaPublisher\Services\FacebookService
  */
-class FaceBook extends Facade {
-
+class Facebook extends Facade {
     protected static function getFacadeAccessor() {
-        return \mantix\LaravelSocialMediaPublisher\Services\FacebookService::class;
+        return \Mantix\LaravelSocialMediaPublisher\Services\FacebookService::class;
     }
 }

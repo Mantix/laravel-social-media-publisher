@@ -7,19 +7,19 @@ use Illuminate\Support\Facades\Facade;
 /**
  * Class LinkedIn
  *
- * @method static mixed shareUrl(string $caption, string $url)
- * @method static mixed shareText(string $caption)
- * @method static mixed shareImage(string $caption, string $image_url)
- * @method static mixed shareVideo(string $caption, string $video_url)
- * @method static mixed shareToCompanyPage(string $caption, string $url)
- * @method static mixed getUserInfo()
+ * This Facade acts as the entry point for LinkedIn Oauth and Connection handling.
+ * * Usage:
+ * 1. Oauth: LinkedIn::getAuthorizationUrl(...)
+ * 2. Publishing: LinkedIn::forConnection($connection)->shareText(...)
  *
- * @see \mantix\LaravelSocialMediaPublisher\Services\LinkedInService
+ * @method static string getAuthorizationUrl(string $redirectUri, array $scopes = [], ?string $state = null)
+ * @method static array handleCallback(string $code, string $redirectUri)
+ * @method static \Mantix\LaravelSocialMediaPublisher\Services\LinkedInService forConnection(\Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection)
+ *
+ * @see \Mantix\LaravelSocialMediaPublisher\Services\LinkedInService
  */
-class LinkedIn extends Facade
-{
-    protected static function getFacadeAccessor()
-    {
-        return \mantix\LaravelSocialMediaPublisher\Services\LinkedInService::class;
+class LinkedIn extends Facade {
+    protected static function getFacadeAccessor() {
+        return \Mantix\LaravelSocialMediaPublisher\Services\LinkedInService::class;
     }
 }

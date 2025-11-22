@@ -8,794 +8,328 @@ use Mantix\LaravelSocialMediaPublisher\Contracts\ShareImagePostInterface;
 use Mantix\LaravelSocialMediaPublisher\Contracts\ShareInterface;
 use Mantix\LaravelSocialMediaPublisher\Contracts\ShareVideoPostInterface;
 use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
+use Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 
 /**
  * Class InstagramService
  *
- * Service for managing and publishing content to Instagram using the Instagram Basic Display API and Instagram Graph API.
+ * Service for managing and publishing content to Instagram Business/Creator Accounts via the Graph API.
  *
- * Implements sharing of images and videos to Instagram.
+ * @package Mantix\LaravelSocialMediaPublisher\Services
  */
-class InstagramService extends SocialMediaService implements ShareInterface, ShareImagePostInterface, ShareVideoPostInterface
-{
-    /**
-     * @var string Instagram Access Token
-     */
-    private $access_token;
+class InstagramService extends SocialMediaService implements ShareInterface, ShareImagePostInterface, ShareVideoPostInterface {
+    /** @var string Facebook/Instagram User Access Token */
+    private string $accessToken;
+
+    /** @var string The Instagram Business Account ID (IG User ID) */
+    private string $accountId;
+
+    /** @var string API Version */
+    private const API_VERSION = 'v20.0';
+
+    /** @var string Base Graph URL */
+    private const GRAPH_URL = 'https://graph.facebook.com';
 
     /**
-     * @var string Instagram Business Account ID
+     * InstagramService Constructor.
+     *
+     * @param string $accessToken
+     * @param string $accountId
      */
-    private $instagram_account_id;
-
-    /**
-     * @var InstagramService|null Singleton instance
-     */
-    private static ?InstagramService $instance = null;
-
-    /**
-     * Instagram API base URL
-     */
-    private const API_BASE_URL = 'https://graph.facebook.com/v20.0';
-
-    /**
-     * Private constructor to prevent direct instantiation.
-     */
-    private function __construct(
-        string $accessToken,
-        string $instagramAccountId
-    ) {
-        $this->access_token = $accessToken;
-        $this->instagram_account_id = $instagramAccountId;
-    }
-
-    /**
-     * Get instance - OAuth connection required.
-     * 
-     * @return InstagramService
-     * @throws SocialMediaException
-     * @deprecated Use forConnection() with a SocialMediaConnection instead
-     */
-    public static function getInstance(): InstagramService
-    {
-        throw new SocialMediaException('OAuth connection required. Please use forConnection() with a SocialMediaConnection or authenticate via OAuth first.');
+    public function __construct(string $accessToken, string $accountId) {
+        $this->accessToken = $accessToken;
+        $this->accountId = $accountId;
     }
 
     /**
      * Create a new instance from a SocialMediaConnection.
      *
-     * @param \mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection
-     * @return InstagramService
+     * @param SocialMediaConnection $connection
+     * @return self
      * @throws SocialMediaException
      */
-    public static function forConnection(\mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection): InstagramService
-    {
+    public static function forConnection(SocialMediaConnection $connection): self {
         if ($connection->platform !== 'instagram') {
-            throw new SocialMediaException('Connection is not for Instagram platform.');
+            throw new SocialMediaException('Connection is not for the Instagram platform.');
         }
 
-        $accessToken = $connection->getDecryptedAccessToken();
-        $metadata = $connection->metadata ?? [];
-        $instagramAccountId = $connection->platform_user_id ?? $metadata['instagram_account_id'] ?? null;
+        $token = $connection->getDecryptedAccessToken();
 
-        if (!$accessToken || !$instagramAccountId) {
-            throw new SocialMediaException('Instagram connection is missing required credentials.');
+        // For Instagram, the platform_user_id MUST be the Instagram Business Account ID
+        $accountId = $connection->platform_user_id;
+
+        if (!$token || !$accountId) {
+            throw new SocialMediaException('Instagram connection is missing credentials.');
         }
 
-        return new self($accessToken, $instagramAccountId);
+        return new self($token, $accountId);
     }
 
+    /* --------------------------------------------------------------------------
+     * AUTHENTICATION & DISCOVERY
+     * -------------------------------------------------------------------------- */
+
     /**
-     * Get the authorization URL for Instagram OAuth 2.0.
-     * Note: Instagram uses Facebook's OAuth system, so this uses Facebook's authorization URL.
+     * Get the authorization URL (Uses Facebook Login).
      *
      * @param string $redirectUri
-     * @param string|null $state
      * @param array $scopes
+     * @param string|null $state
      * @return string
      * @throws SocialMediaException
      */
-    public static function getAuthorizationUrl(string $redirectUri, ?string $state = null, array $scopes = ['instagram_basic', 'instagram_content_publish', 'pages_show_list', 'pages_read_engagement']): string
-    {
-        $clientId = config('social_media_publisher.instagram_client_id') ?? config('social_media_publisher.facebook_client_id');
-        $clientSecret = config('social_media_publisher.instagram_client_secret') ?? config('social_media_publisher.facebook_client_secret');
-
-        if (!$clientId || !$clientSecret) {
-            throw new SocialMediaException('Instagram Client ID and Client Secret must be configured for OAuth.');
-        }
-
-        $state = $state ?? bin2hex(random_bytes(16));
-        $scopeString = implode(',', $scopes);
-
-        $authUrl = sprintf(
-            'https://www.facebook.com/v20.0/dialog/oauth?client_id=%s&redirect_uri=%s&scope=%s&state=%s&response_type=code',
-            urlencode($clientId),
-            urlencode($redirectUri),
-            urlencode($scopeString),
-            urlencode($state)
-        );
-
-        if (config('social_media_publisher.enable_logging', true)) {
-            Log::info('Instagram OAuth authorization URL generated', [
-                'platform' => 'instagram',
-                'redirect_uri' => $redirectUri,
-                'scopes' => $scopes,
-                'state' => $state,
-                'has_client_id' => !empty($clientId),
-            ]);
-        }
-
-        return $authUrl;
+    public static function getAuthorizationUrl(
+        string $redirectUri,
+        array $scopes = ['instagram_basic', 'instagram_content_publish', 'pages_show_list', 'pages_read_engagement'],
+        ?string $state = null
+    ): string {
+        // Reuse Facebook Service logic or config, as Instagram uses Facebook OAuth
+        return FacebookService::getAuthorizationUrl($redirectUri, $scopes, $state);
     }
 
     /**
-     * Handle the OAuth callback and exchange code for access token.
-     * Note: Instagram uses Facebook's OAuth system, so this uses Facebook's token endpoint.
+     * Handle Callback (Exchange code for token).
      *
      * @param string $code
      * @param string $redirectUri
      * @return array
+     */
+    public static function handleCallback(string $code, string $redirectUri): array {
+        // Reuse Facebook Service logic because the endpoint is identical
+        return FacebookService::handleCallback($code, $redirectUri);
+    }
+
+    /**
+     * Get a list of Instagram Business Accounts available to the user.
+     * Use this to allow the user to select which IG account to connect.
+     *
+     * @return array List of ['id' => '...', 'username' => '...', 'name' => '...']
      * @throws SocialMediaException
      */
-    public static function handleCallback(string $code, string $redirectUri): array
-    {
-        $enableLogging = config('social_media_publisher.enable_logging', true);
-        
-        if ($enableLogging) {
-            Log::info('Instagram OAuth callback initiated', [
-                'platform' => 'instagram',
-                'redirect_uri' => $redirectUri,
-                'has_code' => !empty($code),
-            ]);
-        }
-
-        $clientId = config('social_media_publisher.instagram_client_id') ?? config('social_media_publisher.facebook_client_id');
-        $clientSecret = config('social_media_publisher.instagram_client_secret') ?? config('social_media_publisher.facebook_client_secret');
-
-        if (!$clientId || !$clientSecret) {
-            if ($enableLogging) {
-                Log::error('Instagram OAuth callback failed: missing credentials', [
-                    'platform' => 'instagram',
-                    'has_client_id' => !empty($clientId),
-                    'has_client_secret' => !empty($clientSecret),
-                ]);
-            }
-            throw new SocialMediaException('Instagram Client ID and Client Secret must be configured for OAuth.');
-        }
-
-        // Exchange code for access token (using Facebook's endpoint)
-        $tokenUrl = 'https://graph.facebook.com/v20.0/oauth/access_token';
-        
-        if ($enableLogging) {
-            Log::debug('Exchanging Instagram OAuth code for access token', [
-                'platform' => 'instagram',
-                'token_url' => $tokenUrl,
-                'redirect_uri' => $redirectUri,
-            ]);
-        }
-        
-        $timeout = config('social_media_publisher.timeout', 30);
-        $response = Http::timeout($timeout)->asForm()->post($tokenUrl, [
-            'client_id' => $clientId,
-            'client_secret' => $clientSecret,
-            'redirect_uri' => $redirectUri,
-            'code' => $code,
+    public function getBusinessAccounts(): array {
+        // 1. Get User's Facebook Pages
+        $response = $this->sendRequest('get', 'me/accounts', [
+            'fields' => 'name,instagram_business_account{id,username,name,profile_picture_url}'
         ]);
 
-        if (!$response->successful()) {
-            if ($enableLogging) {
-                Log::error('Instagram OAuth token exchange failed', [
-                    'platform' => 'instagram',
-                    'status' => $response->status(),
-                    'response' => $response->body(),
-                ]);
-            }
-            throw new SocialMediaException('Failed to exchange code for access token: ' . $response->body());
-        }
+        $accounts = [];
 
-        $tokenData = $response->json();
-        $accessToken = $tokenData['access_token'] ?? null;
-        $expiresIn = $tokenData['expires_in'] ?? null;
-
-        if (!$accessToken) {
-            if ($enableLogging) {
-                Log::error('Instagram OAuth callback failed: missing access token', [
-                    'platform' => 'instagram',
-                    'response' => $tokenData,
-                ]);
-            }
-            throw new SocialMediaException('Failed to obtain access token from Instagram OAuth response.');
-        }
-
-        // Get user's Facebook pages (to find connected Instagram accounts)
-        $pages = self::getFacebookPages($accessToken);
-        
-        // Find Instagram Business Account connected to a page
-        $instagramAccount = null;
-        foreach ($pages as $page) {
-            $pageId = $page['id'] ?? null;
-            if ($pageId) {
-                $instagramAccounts = self::getInstagramAccounts($accessToken, $pageId);
-                if (!empty($instagramAccounts)) {
-                    $instagramAccount = $instagramAccounts[0];
-                    break;
+        if (isset($response['data'])) {
+            foreach ($response['data'] as $page) {
+                // We only care about pages that have an IG Business Account linked
+                if (isset($page['instagram_business_account'])) {
+                    $ig = $page['instagram_business_account'];
+                    $accounts[] = [
+                        'id' => $ig['id'],
+                        'username' => $ig['username'] ?? '',
+                        'name' => $ig['name'] ?? $ig['username'],
+                        'profile_picture' => $ig['profile_picture_url'] ?? null,
+                        'facebook_page_name' => $page['name'] // Useful for UI context
+                    ];
                 }
             }
         }
 
-        if (!$instagramAccount) {
-            throw new SocialMediaException('No Instagram Business Account found. Please ensure your Facebook Page is connected to an Instagram Business Account.');
-        }
-
-        if ($enableLogging) {
-            Log::info('Instagram OAuth callback completed successfully', [
-                'platform' => 'instagram',
-                'instagram_account_id' => $instagramAccount['id'] ?? null,
-                'instagram_username' => $instagramAccount['username'] ?? null,
-                'expires_in' => $expiresIn,
-            ]);
-        }
-
-        return [
-            'access_token' => $accessToken,
-            'expires_in' => $expiresIn,
-            'token_type' => $tokenData['token_type'] ?? 'bearer',
-            'instagram_account' => $instagramAccount,
-        ];
+        return $accounts;
     }
 
+    /* --------------------------------------------------------------------------
+     * PUBLISHING METHODS
+     * -------------------------------------------------------------------------- */
+
     /**
-     * Extend short-lived access token to long-lived access token.
-     * Instagram uses Facebook's token extension system.
+     * Share a single image to the Feed.
      *
-     * @param string $shortLivedToken The short-lived access token to extend.
-     * @return array Response containing long-lived access token and expiration.
+     * @param string $caption
+     * @param string $imageUrl Must be a public URL (JPEG).
+     * @return array
      * @throws SocialMediaException
      */
-    public static function extendAccessToken(string $shortLivedToken): array
-    {
-        $enableLogging = config('social_media_publisher.enable_logging', true);
-        
-        if ($enableLogging) {
-            Log::info('Instagram extend token initiated', [
-                'platform' => 'instagram',
-                'has_token' => !empty($shortLivedToken),
-            ]);
-        }
-
-        $clientId = config('social_media_publisher.instagram_client_id') ?? config('social_media_publisher.facebook_client_id');
-        $clientSecret = config('social_media_publisher.instagram_client_secret') ?? config('social_media_publisher.facebook_client_secret');
-
-        if (!$clientId || !$clientSecret) {
-            if ($enableLogging) {
-                Log::error('Instagram extend token failed: missing credentials', [
-                    'platform' => 'instagram',
-                    'has_client_id' => !empty($clientId),
-                    'has_client_secret' => !empty($clientSecret),
-                ]);
-            }
-            throw new SocialMediaException('Instagram/Facebook Client ID and Client Secret must be configured.');
-        }
-
-        $tokenUrl = 'https://graph.facebook.com/v20.0/oauth/access_token';
-        
-        if ($enableLogging) {
-            Log::debug('Extending Instagram access token', [
-                'platform' => 'instagram',
-                'token_url' => $tokenUrl,
-            ]);
-        }
-        
-        $timeout = config('social_media_publisher.timeout', 30);
-        $response = Http::timeout($timeout)->get($tokenUrl, [
-            'grant_type' => 'fb_exchange_token',
-            'client_id' => $clientId,
-            'client_secret' => $clientSecret,
-            'fb_exchange_token' => $shortLivedToken,
+    public function shareImage(string $caption, string $imageUrl): array {
+        // 1. Create Media Container
+        $container = $this->sendRequest('post', "{$this->accountId}/media", [
+            'image_url' => $imageUrl,
+            'caption' => $caption,
+            'is_carousel_item' => false
         ]);
 
-        if (!$response->successful()) {
-            if ($enableLogging) {
-                Log::error('Instagram extend token failed', [
-                    'platform' => 'instagram',
-                    'status' => $response->status(),
-                    'response' => $response->body(),
-                ]);
-            }
-            throw new SocialMediaException('Failed to extend access token: ' . $response->body());
-        }
-
-        $tokenData = $response->json();
-        
-        if ($enableLogging) {
-            Log::info('Instagram access token extended successfully', [
-                'platform' => 'instagram',
-                'expires_in' => $tokenData['expires_in'] ?? null,
-            ]);
-        }
-
-        return $tokenData;
+        // 2. Publish
+        return $this->publishContainer($container['id']);
     }
 
     /**
-     * Refresh access token using refresh token (alias for extendAccessToken for consistency).
-     * Note: Instagram doesn't use refresh tokens, but uses Facebook's token extension instead.
-     * This method is provided for API consistency with other platforms.
+     * Share a video to Reels/Feed.
      *
-     * @param string $shortLivedToken The short-lived access token to extend.
-     * @return array Response containing long-lived access token and expiration.
-     * @throws SocialMediaException
-     */
-    public static function refreshAccessToken(string $shortLivedToken): array
-    {
-        return self::extendAccessToken($shortLivedToken);
-    }
-
-    /**
-     * Get Facebook pages for the authenticated user.
-     *
-     * @param string $accessToken
+     * @param string $caption
+     * @param string $videoUrl Must be a public URL (MP4/MOV).
      * @return array
      * @throws SocialMediaException
      */
-    private static function getFacebookPages(string $accessToken): array
-    {
-        $timeout = config('social_media_publisher.timeout', 30);
-        $response = Http::timeout($timeout)
-            ->get('https://graph.facebook.com/v20.0/me/accounts', [
-                'access_token' => $accessToken,
-                'fields' => 'id,name,access_token',
-            ]);
+    public function shareVideo(string $caption, string $videoUrl): array {
+        // 1. Create Media Container
+        $container = $this->sendRequest('post', "{$this->accountId}/media", [
+            'media_type' => 'VIDEO',
+            'video_url' => $videoUrl,
+            'caption' => $caption
+        ]);
 
-        if (!$response->successful()) {
-            throw new SocialMediaException('Failed to get Facebook pages: ' . $response->body());
-        }
+        // 2. Wait for Processing (Crucial for Video)
+        $this->waitForContainer($container['id']);
 
-        $data = $response->json();
-        return $data['data'] ?? [];
+        // 3. Publish
+        return $this->publishContainer($container['id']);
     }
 
     /**
-     * Get Instagram Business Accounts connected to a Facebook Page.
+     * Share a Carousel (Album).
      *
-     * @param string $accessToken
-     * @param string $pageId
+     * @param string $caption
+     * @param array $mediaUrls Array of image URLs.
      * @return array
      * @throws SocialMediaException
      */
-    private static function getInstagramAccounts(string $accessToken, string $pageId): array
-    {
-        $timeout = config('social_media_publisher.timeout', 30);
-        $response = Http::timeout($timeout)
-            ->get("https://graph.facebook.com/v20.0/{$pageId}", [
-                'access_token' => $accessToken,
-                'fields' => 'instagram_business_account{id,username}',
+    public function shareCarousel(string $caption, array $mediaUrls): array {
+        if (count($mediaUrls) < 2 || count($mediaUrls) > 10) {
+            throw new SocialMediaException("Instagram Carousels require between 2 and 10 items.");
+        }
+
+        $childrenIds = [];
+
+        // 1. Create containers for each item
+        foreach ($mediaUrls as $url) {
+            $child = $this->sendRequest('post', "{$this->accountId}/media", [
+                'image_url' => $url,
+                'is_carousel_item' => true
             ]);
+            $childrenIds[] = $child['id'];
+        }
+
+        // 2. Create Carousel Container
+        $carouselContainer = $this->sendRequest('post', "{$this->accountId}/media", [
+            'media_type' => 'CAROUSEL',
+            'children' => implode(',', $childrenIds),
+            'caption' => $caption
+        ]);
+
+        // 3. Publish
+        return $this->publishContainer($carouselContainer['id']);
+    }
+
+    /**
+     * Share an Image Story.
+     *
+     * @param string $imageUrl Public URL of image (9:16 aspect ratio recommended).
+     * @return array
+     * @throws SocialMediaException
+     */
+    public function shareStoryImage(string $imageUrl): array {
+        $container = $this->sendRequest('post', "{$this->accountId}/media", [
+            'image_url' => $imageUrl,
+            'media_type' => 'STORIES'
+        ]);
+
+        return $this->publishContainer($container['id']);
+    }
+
+    /**
+     * Share a Video Story.
+     *
+     * @param string $videoUrl Public URL of video.
+     * @return array
+     * @throws SocialMediaException
+     */
+    public function shareStoryVideo(string $videoUrl): array {
+        $container = $this->sendRequest('post', "{$this->accountId}/media", [
+            'video_url' => $videoUrl,
+            'media_type' => 'STORIES'
+        ]);
+
+        $this->waitForContainer($container['id']);
+
+        return $this->publishContainer($container['id']);
+    }
+
+    /**
+     * Placeholder for Interface Compliance.
+     * Instagram does not support text-only posts or "URL" posts in the traditional sense.
+     */
+    public function shareText(string $caption): array {
+        throw new SocialMediaException("Instagram does not support text-only posts.");
+    }
+
+    /**
+     * Placeholder for Interface Compliance.
+     */
+    public function shareUrl(string $caption, string $url): array {
+        throw new SocialMediaException("Instagram does not support direct URL sharing via API. Please use shareImage/shareStory with the link burned into the media or bio.");
+    }
+
+    /* --------------------------------------------------------------------------
+     * INTERNAL HELPERS
+     * -------------------------------------------------------------------------- */
+
+    /**
+     * Publish a Media Container.
+     *
+     * @param string $creationId
+     * @return array
+     * @throws SocialMediaException
+     */
+    private function publishContainer(string $creationId): array {
+        return $this->sendRequest('post', "{$this->accountId}/media_publish", [
+            'creation_id' => $creationId
+        ]);
+    }
+
+    /**
+     * Poll the status of a container until it is ready to publish.
+     *
+     * @param string $containerId
+     * @param int $maxRetries
+     * @return void
+     * @throws SocialMediaException
+     */
+    private function waitForContainer(string $containerId, int $maxRetries = 10): void {
+        $attempts = 0;
+
+        do {
+            $attempts++;
+            sleep(3); // Wait 3 seconds between checks
+
+            $status = $this->sendRequest('get', $containerId, [
+                'fields' => 'status_code,status'
+            ]);
+
+            $code = $status['status_code'] ?? 'UNKNOWN';
+
+            if ($code === 'FINISHED') {
+                return;
+            }
+
+            if ($code === 'ERROR') {
+                throw new SocialMediaException("Instagram Media Processing Failed: " . ($status['status'] ?? 'Unknown Error'));
+            }
+
+            if ($attempts >= $maxRetries) {
+                throw new SocialMediaException("Instagram Media Processing Timed Out.");
+            }
+        } while ($code === 'IN_PROGRESS' || $code === 'EXPIRED');
+    }
+
+    /**
+     * Send request to Graph API.
+     */
+    protected function sendRequest(string $method, string $endpoint, array $params = [], array $headers = []): array {
+        $url = self::GRAPH_URL . '/' . self::API_VERSION . '/' . $endpoint;
+
+        $params['access_token'] = $this->accessToken;
+
+        $response = Http::timeout(60)->$method($url, $params);
 
         if (!$response->successful()) {
-            throw new SocialMediaException('Failed to get Instagram accounts: ' . $response->body());
-        }
-
-        $data = $response->json();
-        $instagramAccount = $data['instagram_business_account'] ?? null;
-        
-        return $instagramAccount ? [$instagramAccount] : [];
-    }
-
-    /**
-     * Disconnect from Instagram (revoke access token).
-     *
-     * @param string $accessToken
-     * @return bool
-     */
-    public static function disconnect(string $accessToken): bool
-    {
-        $enableLogging = config('social_media_publisher.enable_logging', true);
-        
-        try {
-            // Instagram uses Facebook's revoke endpoint
-            $revokeUrl = 'https://graph.facebook.com/v20.0/me/permissions';
-            
-            if ($enableLogging) {
-                Log::info('Revoking Instagram access token', [
-                    'platform' => 'instagram',
-                ]);
-            }
-            
-            $timeout = config('social_media_publisher.timeout', 30);
-            $response = Http::timeout($timeout)
-                ->delete($revokeUrl, [
-                    'access_token' => $accessToken,
-                ]);
-
-            if ($response->successful()) {
-                if ($enableLogging) {
-                    Log::info('Instagram access token revoked successfully', [
-                        'platform' => 'instagram',
-                    ]);
-                }
-                return true;
-            }
-
-            if ($enableLogging) {
-                Log::error('Failed to revoke Instagram access token', [
-                    'platform' => 'instagram',
-                    'status' => $response->status(),
-                    'response' => $response->body(),
-                ]);
-            }
-            return false;
-        } catch (\Exception $e) {
-            if ($enableLogging) {
-                Log::error('Failed to disconnect Instagram', [
-                    'platform' => 'instagram',
-                    'error' => $e->getMessage(),
-                    'exception' => get_class($e),
-                ]);
-            }
-            return false;
-        }
-    }
-
-    /**
-     * Share a text post with a URL to Instagram (as a story or feed post).
-     * Note: Instagram doesn't support direct URL sharing in feed posts, so this creates a story.
-     *
-     * @param string $caption The text content of the post.
-     * @param string $url The URL to share.
-     * @return array Response from the Instagram API.
-     * @throws SocialMediaException
-     */
-    public function shareUrl(string $caption, string $url): array
-    {
-        $this->validateInput($caption, $url);
-        
-        try {
-            // Instagram doesn't support direct URL sharing in feed posts
-            // We'll create a story with the URL
-            return $this->shareStory($caption, $url);
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to share to Instagram', [
-                'platform' => 'instagram',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-            ]);
-            throw new SocialMediaException('Failed to share to Instagram: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Share an image post with a caption to Instagram.
-     *
-     * @param string $caption The caption to accompany the image.
-     * @param string $image_url The URL of the image.
-     * @return array Response from the Instagram API.
-     * @throws SocialMediaException
-     */
-    public function shareImage(string $caption, string $image_url): array
-    {
-        $this->validateInput($caption, $image_url);
-        
-        try {
-            // Step 1: Create media container
-            $containerUrl = $this->buildApiUrl($this->instagram_account_id . '/media');
-            $containerParams = [
-                'image_url' => $image_url,
-                'caption' => $caption,
-                'access_token' => $this->access_token
-            ];
-
-            $containerResponse = $this->sendRequest($containerUrl, 'post', $containerParams);
-            $containerId = $containerResponse['id'];
-
-            // Step 2: Publish the media
-            $publishUrl = $this->buildApiUrl($this->instagram_account_id . '/media_publish');
-            $publishParams = [
-                'creation_id' => $containerId,
-                'access_token' => $this->access_token
-            ];
-
-            $response = $this->sendRequest($publishUrl, 'post', $publishParams);
-            $this->log('info', 'Instagram image post shared successfully', [
-                'platform' => 'instagram',
-                'media_id' => $response['id'] ?? null,
-                'instagram_account_id' => $this->instagram_account_id,
-                'caption_length' => strlen($caption),
-            ]);
-            return $response;
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to share image to Instagram', [
-                'platform' => 'instagram',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'instagram_account_id' => $this->instagram_account_id,
-                'image_url' => $image_url,
-            ]);
-            throw new SocialMediaException('Failed to share image to Instagram: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Share a video post with a caption to Instagram.
-     *
-     * @param string $caption The caption to accompany the video.
-     * @param string $video_url The URL of the video.
-     * @return array Response from the Instagram API.
-     * @throws SocialMediaException
-     */
-    public function shareVideo(string $caption, string $video_url): array
-    {
-        $this->validateInput($caption, $video_url);
-        
-        try {
-            // Step 1: Create media container
-            $containerUrl = $this->buildApiUrl($this->instagram_account_id . '/media');
-            $containerParams = [
-                'media_type' => 'VIDEO',
-                'video_url' => $video_url,
-                'caption' => $caption,
-                'access_token' => $this->access_token
-            ];
-
-            $containerResponse = $this->sendRequest($containerUrl, 'post', $containerParams);
-            $containerId = $containerResponse['id'];
-
-            // Step 2: Publish the media
-            $publishUrl = $this->buildApiUrl($this->instagram_account_id . '/media_publish');
-            $publishParams = [
-                'creation_id' => $containerId,
-                'access_token' => $this->access_token
-            ];
-
-            $response = $this->sendRequest($publishUrl, 'post', $publishParams);
-            $this->log('info', 'Instagram video post shared successfully', [
-                'platform' => 'instagram',
-                'media_id' => $response['id'] ?? null,
-                'instagram_account_id' => $this->instagram_account_id,
-                'caption_length' => strlen($caption),
-            ]);
-            return $response;
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to share video to Instagram', [
-                'platform' => 'instagram',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'instagram_account_id' => $this->instagram_account_id,
-                'video_url' => $video_url,
-            ]);
-            throw new SocialMediaException('Failed to share video to Instagram: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Share a story with text and URL.
-     *
-     * @param string $caption The text content.
-     * @param string $url The URL to share.
-     * @return array Response from the Instagram API.
-     * @throws SocialMediaException
-     */
-    public function shareStory(string $caption, string $url): array
-    {
-        $this->validateInput($caption, $url);
-        
-        try {
-            // Create a story with text overlay
-            $storyUrl = $this->buildApiUrl($this->instagram_account_id . '/media');
-            $storyParams = [
-                'media_type' => 'STORIES',
-                'image_url' => $this->createTextImage($caption, $url),
-                'access_token' => $this->access_token
-            ];
-
-            $response = $this->sendRequest($storyUrl, 'post', $storyParams);
-            $this->log('info', 'Instagram story shared successfully', [
-                'platform' => 'instagram',
-                'media_id' => $response['id'] ?? null,
-                'instagram_account_id' => $this->instagram_account_id,
-            ]);
-            return $response;
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to share story to Instagram', [
-                'platform' => 'instagram',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'instagram_account_id' => $this->instagram_account_id,
-            ]);
-            throw new SocialMediaException('Failed to share story to Instagram: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Share a carousel post with multiple images.
-     *
-     * @param string $caption The caption for the carousel.
-     * @param array $image_urls Array of image URLs.
-     * @return array Response from the Instagram API.
-     * @throws SocialMediaException
-     */
-    public function shareCarousel(string $caption, array $image_urls): array
-    {
-        if (empty($image_urls) || count($image_urls) < 2 || count($image_urls) > 10) {
-            throw new SocialMediaException('Carousel must contain between 2 and 10 images.');
-        }
-
-        try {
-            $children = [];
-
-            // Step 1: Create media containers for each image
-            foreach ($image_urls as $image_url) {
-                $containerUrl = $this->buildApiUrl($this->instagram_account_id . '/media');
-                $containerParams = [
-                    'image_url' => $image_url,
-                    'is_carousel_item' => true,
-                    'access_token' => $this->access_token
-                ];
-
-                $containerResponse = $this->sendRequest($containerUrl, 'post', $containerParams);
-                $children[] = $containerResponse['id'];
-            }
-
-            // Step 2: Create carousel container
-            $carouselUrl = $this->buildApiUrl($this->instagram_account_id . '/media');
-            $carouselParams = [
-                'media_type' => 'CAROUSEL',
-                'children' => implode(',', $children),
-                'caption' => $caption,
-                'access_token' => $this->access_token
-            ];
-
-            $carouselResponse = $this->sendRequest($carouselUrl, 'post', $carouselParams);
-            $carouselId = $carouselResponse['id'];
-
-            // Step 3: Publish the carousel
-            $publishUrl = $this->buildApiUrl($this->instagram_account_id . '/media_publish');
-            $publishParams = [
-                'creation_id' => $carouselId,
-                'access_token' => $this->access_token
-            ];
-
-            $response = $this->sendRequest($publishUrl, 'post', $publishParams);
-            $this->log('info', 'Instagram carousel post shared successfully', [
-                'platform' => 'instagram',
-                'media_id' => $response['id'] ?? null,
-                'instagram_account_id' => $this->instagram_account_id,
-                'images_count' => count($image_urls),
-            ]);
-            return $response;
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to share carousel to Instagram', [
-                'platform' => 'instagram',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'instagram_account_id' => $this->instagram_account_id,
-            ]);
-            throw new SocialMediaException('Failed to share carousel to Instagram: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Get Instagram account information.
-     *
-     * @return array Response from the Instagram API.
-     * @throws SocialMediaException
-     */
-    public function getAccountInfo(): array
-    {
-        try {
-            $url = $this->buildApiUrl($this->instagram_account_id);
-            $params = [
-                'fields' => 'id,username,account_type,media_count,followers_count,follows_count',
-                'access_token' => $this->access_token
-            ];
-
-            return $this->sendRequest($url, 'get', $params);
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to get Instagram account info', [
-                'platform' => 'instagram',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'instagram_account_id' => $this->instagram_account_id,
-            ]);
-            throw new SocialMediaException('Failed to get Instagram account info: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Get recent media from Instagram account.
-     *
-     * @param int $limit Number of media items to retrieve.
-     * @return array Response from the Instagram API.
-     * @throws SocialMediaException
-     */
-    public function getRecentMedia(int $limit = 25): array
-    {
-        try {
-            $url = $this->buildApiUrl($this->instagram_account_id . '/media');
-            $params = [
-                'fields' => 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp',
-                'limit' => min($limit, 25),
-                'access_token' => $this->access_token
-            ];
-
-            return $this->sendRequest($url, 'get', $params);
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to get Instagram recent media', [
-                'platform' => 'instagram',
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'instagram_account_id' => $this->instagram_account_id,
-                'limit' => $limit,
-            ]);
-            throw new SocialMediaException('Failed to get Instagram recent media: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Create a text image for stories.
-     *
-     * @param string $text The text to display.
-     * @param string $url The URL to include.
-     * @return string The URL of the generated image.
-     * @throws SocialMediaException
-     */
-    private function createTextImage(string $text, string $url): string
-    {
-        // This is a simplified implementation
-        // In a real scenario, you might want to use a service like Canva API or generate images programmatically
-        $imageText = $text . "\n\n" . $url;
-        
-        // For now, return a placeholder image URL
-        // In production, you should generate an actual image with the text
-        return 'https://via.placeholder.com/1080x1920/000000/FFFFFF?text=' . urlencode($imageText);
-    }
-
-    /**
-     * Validate input parameters.
-     *
-     * @param string $caption The caption text.
-     * @param string $url The URL.
-     * @throws SocialMediaException
-     */
-    private function validateInput(string $caption, string $url): void
-    {
-        if (empty(trim($caption))) {
-            throw new SocialMediaException('Caption cannot be empty.');
-        }
-
-        if (!filter_var($url, FILTER_VALIDATE_URL)) {
-            throw new SocialMediaException('Invalid URL provided.');
-        }
-    }
-
-    /**
-     * Build Instagram API URL.
-     *
-     * @param string $endpoint The API endpoint.
-     * @return string Complete API URL.
-     */
-    private function buildApiUrl(string $endpoint): string
-    {
-        return self::API_BASE_URL . '/' . $endpoint;
-    }
-
-    /**
-     * Send authenticated request to Instagram API.
-     *
-     * @param string $url The API URL.
-     * @param string $method The HTTP method.
-     * @param array $params The request parameters.
-     * @return array Response from the API.
-     * @throws SocialMediaException
-     */
-    protected function sendRequest(string $url, string $method = 'post', array $params = [], array $headers = []): array
-    {
-        $response = \Illuminate\Support\Facades\Http::withHeaders($headers)->{$method}($url, $params);
-
-        if (!$response->successful()) {
-            $errorData = $response->json();
-            $errorMessage = $errorData['error']['message'] ?? 'Unknown error occurred';
-            throw new SocialMediaException("Instagram API error: {$errorMessage}");
+            $error = $response->json()['error']['message'] ?? $response->body();
+            Log::error("Instagram API Error [{$endpoint}]", ['error' => $error]);
+            throw new SocialMediaException("Instagram API Error: $error");
         }
 
         return $response->json();
