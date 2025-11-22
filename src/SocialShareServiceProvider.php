@@ -10,7 +10,7 @@ use Mantix\LaravelSocialMediaPublisher\Services\PinterestService;
 use Mantix\LaravelSocialMediaPublisher\Services\SocialMediaManager;
 use Mantix\LaravelSocialMediaPublisher\Services\TelegramService;
 use Mantix\LaravelSocialMediaPublisher\Services\TikTokService;
-use Mantix\LaravelSocialMediaPublisher\Services\TwitterService;
+use Mantix\LaravelSocialMediaPublisher\Services\XService;
 use Mantix\LaravelSocialMediaPublisher\Services\YouTubeService;
 
 class SocialShareServiceProvider extends ServiceProvider {

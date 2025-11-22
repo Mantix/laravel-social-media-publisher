@@ -14,13 +14,13 @@ return new class extends Migration
         Schema::create('social_media_connections', function (Blueprint $table) {
             $table->id();
             $table->morphs('owner'); // Creates owner_id and owner_type columns for polymorphic relationship
-            $table->string('platform', 20); // facebook, twitter, linkedin, etc.
+            $table->string('platform', 20); // facebook, x, linkedin, etc.
             $table->string('connection_type', 20)->default('profile'); // profile, page, company, etc.
             $table->string('platform_user_id', 192)->nullable(); // User ID on the platform
             $table->string('platform_username', 192)->nullable(); // Username on the platform
             $table->text('access_token')->nullable(); // Encrypted access token
             $table->text('refresh_token')->nullable(); // Encrypted refresh token
-            $table->text('token_secret')->nullable(); // For OAuth 1.0 (Twitter)
+            $table->text('token_secret')->nullable(); // For OAuth 1.0 (X)
             $table->timestamp('expires_at')->nullable(); // Token expiration
             $table->json('metadata')->nullable(); // Additional platform-specific data (page_id, organization_urn, etc.)
             $table->boolean('is_active')->default(true);

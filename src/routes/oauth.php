@@ -27,7 +27,7 @@ Route::withoutMiddleware([VerifyCsrfToken::class])
         Route::get('/linkedin/callback', [OAuthController::class, 'handleLinkedInCallback'])
             ->name('linkedin.callback');
 
-        // Twitter/X OAuth Callback
+        // X (Twitter) OAuth Callback
         Route::get('/x/callback', [OAuthController::class, 'handleXCallback'])
             ->name('x.callback');
 

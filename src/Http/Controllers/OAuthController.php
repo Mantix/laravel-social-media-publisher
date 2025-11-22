@@ -9,7 +9,7 @@ use Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 use Mantix\LaravelSocialMediaPublisher\Services\FacebookService;
 use Mantix\LaravelSocialMediaPublisher\Services\InstagramService;
 use Mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
-use Mantix\LaravelSocialMediaPublisher\Services\TwitterService;
+use Mantix\LaravelSocialMediaPublisher\Services\XService;
 
 /**
  * OAuth Controller
@@ -151,7 +151,7 @@ class OAuthController
     }
 
     /**
-     * Handle Twitter/X OAuth callback.
+     * Handle X (Twitter) OAuth callback.
      */
     public function handleXCallback(Request $request)
     {
@@ -170,7 +170,7 @@ class OAuthController
             $redirectUri = route('social-media.x.callback');
             
             // Retrieve PKCE code verifier from session (recommended approach)
-            $codeVerifier = session('twitter_code_verifier');
+            $codeVerifier = session('x_code_verifier');
             
             // Fallback: Try to extract from state for backward compatibility
             // (This is less secure and should be avoided in production)
@@ -180,7 +180,7 @@ class OAuthController
                 $codeVerifier = $stateData['code_verifier'] ?? null;
             }
             
-            $tokenData = TwitterService::handleCallback($code, $redirectUri, $codeVerifier);
+            $tokenData = XService::handleCallback($code, $redirectUri, $codeVerifier);
 
             $user = auth()->user();
             
@@ -189,14 +189,14 @@ class OAuthController
             }
 
             // Clear code verifier from session after use
-            session()->forget('twitter_code_verifier');
+            session()->forget('x_code_verifier');
 
             // Save connection
             SocialMediaConnection::updateOrCreate(
                 [
                     'owner_id' => $user->id,
                     'owner_type' => get_class($user),
-                    'platform' => 'twitter',
+                    'platform' => 'x',
                     'connection_type' => 'profile',
                 ],
                 [
@@ -214,12 +214,12 @@ class OAuthController
                 ]
             );
 
-            return $this->handleSuccess('x', 'Twitter/X connected successfully!');
+            return $this->handleSuccess('x', 'X (Twitter) connected successfully!');
         } catch (SocialMediaException $e) {
             return $this->handleError('x', 'callback_failed', $e->getMessage());
         } catch (\Exception $e) {
             if (config('social_media_publisher.enable_logging', true)) {
-                Log::error('Twitter/X OAuth callback exception', [
+                Log::error('X (Twitter) OAuth callback exception', [
                     'platform' => 'x',
                     'error' => $e->getMessage(),
                     'exception' => get_class($e),

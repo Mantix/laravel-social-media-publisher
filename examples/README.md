@@ -93,12 +93,12 @@ Create a `.env.example` file with all required credentials:
 FACEBOOK_ACCESS_TOKEN=your_facebook_access_token
 FACEBOOK_PAGE_ID=your_facebook_page_id
 
-# Twitter/X
-TWITTER_BEARER_TOKEN=your_twitter_bearer_token
-TWITTER_API_KEY=your_twitter_api_key
-TWITTER_API_SECRET=your_twitter_api_secret
-TWITTER_ACCESS_TOKEN=your_twitter_access_token
-TWITTER_ACCESS_TOKEN_SECRET=your_twitter_access_token_secret
+# X (Twitter)
+X_BEARER_TOKEN=your_x_bearer_token
+X_API_KEY=your_x_api_key
+X_API_SECRET=your_x_api_secret
+X_ACCESS_TOKEN=your_x_access_token
+X_ACCESS_TOKEN_SECRET=your_x_access_token_secret
 
 # LinkedIn
 LINKEDIN_ACCESS_TOKEN=your_linkedin_access_token

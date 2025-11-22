@@ -16,7 +16,7 @@ use Mantix\LaravelSocialMediaPublisher\Services\SocialMediaManager;
  * @method static array shareVideo($owner, array $platforms, string $caption, string $video_url, ?int $ownerId = null)
  * @method static SocialMediaManager platform(string $platform, $owner = null, ?int $ownerId = null, ?string $connectionType = 'profile')
  * @method static SocialMediaManager facebook()
- * @method static SocialMediaManager twitter()
+ * @method static SocialMediaManager x()
  * @method static SocialMediaManager linkedin()
  * @method static SocialMediaManager instagram()
  * @method static SocialMediaManager tiktok()

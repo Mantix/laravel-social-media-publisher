@@ -125,9 +125,9 @@ trait TestHelpers
     }
 
     /**
-     * Create a Twitter connection.
+     * Create a X connection.
      */
-    protected function createTwitterConnection($owner = null, array $attributes = []): SocialMediaConnection
+    protected function createXConnection($owner = null, array $attributes = []): SocialMediaConnection
     {
         if ($owner === null) {
             $owner = $this->createTestUser();
@@ -136,7 +136,7 @@ trait TestHelpers
         $connection = $this->createConnection(array_merge([
             'owner_id' => $owner->id,
             'owner_type' => get_class($owner),
-            'platform' => 'twitter',
+            'platform' => 'x',
             'connection_type' => 'profile',
             'platform_user_id' => 'test_user_id',
             'metadata' => [

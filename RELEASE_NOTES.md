@@ -1,5 +1,9 @@
 # Release Notes
 
+## v2.1.2
+
+We renamed Twitter to X and FaceBook to Facebook everywhere.
+
 ## v2.1.1 - Added support for Laravel 12
 
 We added support for Laravel 12.

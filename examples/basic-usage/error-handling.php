@@ -8,10 +8,10 @@
 
 require_once __DIR__ . '/../../vendor/autoload.php';
 
-use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
-use Mantix\LaravelSocialMediaPublisher\Facades\FaceBook;
-use Mantix\LaravelSocialMediaPublisher\Facades\Twitter;
 use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
+use Mantix\LaravelSocialMediaPublisher\Facades\FaceBook;
+use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
+use Mantix\LaravelSocialMediaPublisher\Facades\X;
 
 echo "🛡️  Laravel Social Media Publisher - Error Handling Examples\n";
 echo "=====================================================\n\n";
@@ -38,7 +38,7 @@ echo "🌍 Multi-Platform Error Handling\n";
 echo "--------------------------------\n";
 
 try {
-    $platforms = ['facebook', 'twitter', 'linkedin'];
+    $platforms = ['facebook', 'x', 'linkedin'];
     $result = SocialMedia::share($platforms, 'Test multi-platform post', 'https://example.com');
     
     echo "📊 Results Summary:\n";
@@ -75,7 +75,7 @@ echo "-------------------------\n";
 
 // Test empty caption
 try {
-    $result = Twitter::share('', 'https://example.com');
+    $result = X::share('', 'https://example.com');
     echo "❌ Should have failed with empty caption\n";
 } catch (SocialMediaException $e) {
     echo "✅ Caught empty caption error: " . $e->getMessage() . "\n";
@@ -83,7 +83,7 @@ try {
 
 // Test invalid URL
 try {
-    $result = Twitter::share('Test post', 'invalid-url');
+    $result = X::share('Test post', 'invalid-url');
     echo "❌ Should have failed with invalid URL\n";
 } catch (SocialMediaException $e) {
     echo "✅ Caught invalid URL error: " . $e->getMessage() . "\n";
@@ -92,7 +92,7 @@ try {
 // Test caption too long
 try {
     $longCaption = str_repeat('This is a very long caption. ', 100); // Over 280 characters
-    $result = Twitter::share($longCaption, 'https://example.com');
+    $result = X::share($longCaption, 'https://example.com');
     echo "❌ Should have failed with caption too long\n";
 } catch (SocialMediaException $e) {
     echo "✅ Caught caption too long error: " . $e->getMessage() . "\n";
@@ -125,8 +125,8 @@ echo "-----------------------------\n";
 
 try {
     // This would typically happen with network issues
-    $result = Twitter::share('Test post', 'https://example.com');
-    echo "✅ Twitter post successful (or handled gracefully)\n";
+    $result = X::share('Test post', 'https://example.com');
+    echo "✅ X post successful (or handled gracefully)\n";
 } catch (SocialMediaException $e) {
     if (strpos($e->getMessage(), 'timeout') !== false || 
         strpos($e->getMessage(), 'network') !== false ||
@@ -193,7 +193,7 @@ function postWithFallback($platforms, $caption, $url) {
     return ['results' => $results, 'errors' => $errors];
 }
 
-$platforms = ['facebook', 'twitter', 'linkedin'];
+$platforms = ['facebook', 'x', 'linkedin'];
 $fallbackResults = postWithFallback($platforms, 'Test post with fallback', 'https://example.com');
 
 echo "\n📊 Fallback Results Summary:\n";
@@ -208,7 +208,7 @@ echo "-------------------------\n";
 
 try {
     // The package automatically logs all operations
-    $result = SocialMedia::share(['facebook', 'twitter'], 'Test post for logging', 'https://example.com');
+    $result = SocialMedia::share(['facebook', 'x'], 'Test post for logging', 'https://example.com');
     
     echo "✅ Post completed - check your Laravel logs for detailed information\n";
     echo "   Look for log entries with 'Social media API request' or 'Failed to post'\n";
@@ -275,7 +275,7 @@ class SocialMediaErrorHandler {
     }
 }
 
-$customResults = SocialMediaErrorHandler::handlePost(['facebook', 'twitter'], 'Custom error handling test', 'https://example.com');
+$customResults = SocialMediaErrorHandler::handlePost(['facebook', 'x'], 'Custom error handling test', 'https://example.com');
 
 echo "\n📊 Custom Error Handling Results:\n";
 echo "   Total successful posts: " . count($customResults) . "\n";

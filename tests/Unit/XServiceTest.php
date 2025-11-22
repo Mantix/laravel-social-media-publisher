@@ -2,43 +2,43 @@
 
 namespace Mantix\LaravelSocialMediaPublisher\Tests\Unit;
 
-use Mantix\LaravelSocialMediaPublisher\Tests\Unit\TestCase;
-use Mantix\LaravelSocialMediaPublisher\Services\TwitterService;
-use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
+use Mantix\LaravelSocialMediaPublisher\Services\XService;
+use Mantix\LaravelSocialMediaPublisher\Tests\Unit\TestCase;
 
-class TwitterServiceTest extends TestCase
+class XServiceTest extends TestCase
 {
     protected function setUp(): void
     {
         parent::setUp();
         
         config([
-            'social_media_publisher.twitter_bearer_token' => 'test_bearer_token',
-            'social_media_publisher.twitter_api_key' => 'test_api_key',
-            'social_media_publisher.twitter_api_secret' => 'test_api_secret',
-            'social_media_publisher.twitter_access_token' => 'test_access_token',
-            'social_media_publisher.twitter_access_token_secret' => 'test_access_token_secret',
+            'social_media_publisher.x_bearer_token' => 'test_bearer_token',
+            'social_media_publisher.x_api_key' => 'test_api_key',
+            'social_media_publisher.x_api_secret' => 'test_api_secret',
+            'social_media_publisher.x_access_token' => 'test_access_token',
+            'social_media_publisher.x_access_token_secret' => 'test_access_token_secret',
         ]);
     }
 
-    public function testTwitterServiceSingleton()
+    public function testXServiceSingleton()
     {
-        $service1 = TwitterService::getInstance();
-        $service2 = TwitterService::getInstance();
+        $service1 = XService::getInstance();
+        $service2 = XService::getInstance();
         
         $this->assertSame($service1, $service2);
     }
 
-    public function testTwitterServiceWithMissingCredentials()
+    public function testXServiceWithMissingCredentials()
     {
-        config(['social_media_publisher.twitter_bearer_token' => null]);
+        config(['social_media_publisher.x_bearer_token' => null]);
         
         $this->expectException(SocialMediaException::class);
-        $this->expectExceptionMessage('Twitter API credentials are not fully configured');
+        $this->expectExceptionMessage('X (Twitter) API credentials are not fully configured');
         
-        TwitterService::getInstance();
+        XService::getInstance();
     }
 
     public function testShareSuccess()
@@ -47,7 +47,7 @@ class TwitterServiceTest extends TestCase
             'https://api.twitter.com/2/tweets' => Http::response(['data' => ['id' => '123']], 200),
         ]);
 
-        $service = TwitterService::getInstance();
+        $service = XService::getInstance();
         $result = $service->share('Test tweet', 'https://example.com');
 
         $this->assertArrayHasKey('data', $result);
@@ -61,7 +61,7 @@ class TwitterServiceTest extends TestCase
             'https://api.twitter.com/2/tweets' => Http::response(['data' => ['id' => '456']], 200),
         ]);
 
-        $service = TwitterService::getInstance();
+        $service = XService::getInstance();
         $result = $service->shareImage('Test image tweet', 'https://example.com/image.jpg');
 
         $this->assertArrayHasKey('data', $result);
@@ -75,7 +75,7 @@ class TwitterServiceTest extends TestCase
             'https://api.twitter.com/2/tweets' => Http::response(['data' => ['id' => '789']], 200),
         ]);
 
-        $service = TwitterService::getInstance();
+        $service = XService::getInstance();
         $result = $service->shareVideo('Test video tweet', 'https://example.com/video.mp4');
 
         $this->assertArrayHasKey('data', $result);
@@ -93,7 +93,7 @@ class TwitterServiceTest extends TestCase
             ], 200),
         ]);
 
-        $service = TwitterService::getInstance();
+        $service = XService::getInstance();
         $result = $service->getTimeline(5);
 
         $this->assertArrayHasKey('data', $result);
@@ -112,7 +112,7 @@ class TwitterServiceTest extends TestCase
             ], 200),
         ]);
 
-        $service = TwitterService::getInstance();
+        $service = XService::getInstance();
         $result = $service->getUserInfo();
 
         $this->assertArrayHasKey('data', $result);
@@ -121,7 +121,7 @@ class TwitterServiceTest extends TestCase
 
     public function testShareWithEmptyCaption()
     {
-        $service = TwitterService::getInstance();
+        $service = XService::getInstance();
         
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('Caption cannot be empty');
@@ -131,7 +131,7 @@ class TwitterServiceTest extends TestCase
 
     public function testShareWithCaptionTooLong()
     {
-        $service = TwitterService::getInstance();
+        $service = XService::getInstance();
         $longCaption = str_repeat('a', 281); // Over 280 character limit
         
         $this->expectException(SocialMediaException::class);
@@ -142,7 +142,7 @@ class TwitterServiceTest extends TestCase
 
     public function testShareWithInvalidUrl()
     {
-        $service = TwitterService::getInstance();
+        $service = XService::getInstance();
         
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('Invalid URL provided');
@@ -158,10 +158,10 @@ class TwitterServiceTest extends TestCase
             ], 401),
         ]);
 
-        $service = TwitterService::getInstance();
+        $service = XService::getInstance();
         
         $this->expectException(SocialMediaException::class);
-        $this->expectExceptionMessage('Failed to share to Twitter');
+        $this->expectExceptionMessage('Failed to share to X (Twitter)');
         
         $service->share('Test tweet', 'https://example.com');
     }
@@ -174,10 +174,10 @@ class TwitterServiceTest extends TestCase
             ], 400),
         ]);
 
-        $service = TwitterService::getInstance();
+        $service = XService::getInstance();
         
         $this->expectException(SocialMediaException::class);
-        $this->expectExceptionMessage('Failed to share image to Twitter');
+        $this->expectExceptionMessage('Failed to share image to X (Twitter)');
         
         $service->shareImage('Test image tweet', 'https://example.com/image.jpg');
     }
@@ -190,10 +190,10 @@ class TwitterServiceTest extends TestCase
             ], 400),
         ]);
 
-        $service = TwitterService::getInstance();
+        $service = XService::getInstance();
         
         $this->expectException(SocialMediaException::class);
-        $this->expectExceptionMessage('Failed to share video to Twitter');
+        $this->expectExceptionMessage('Failed to share video to X (Twitter)');
         
         $service->shareVideo('Test video tweet', 'https://example.com/video.mp4');
     }
@@ -206,10 +206,10 @@ class TwitterServiceTest extends TestCase
             ], 400),
         ]);
 
-        $service = TwitterService::getInstance();
+        $service = XService::getInstance();
         
         $this->expectException(SocialMediaException::class);
-        $this->expectExceptionMessage('Failed to get Twitter timeline');
+        $this->expectExceptionMessage('Failed to get X (Twitter) timeline');
         
         $service->getTimeline(5);
     }
@@ -222,10 +222,10 @@ class TwitterServiceTest extends TestCase
             ], 400),
         ]);
 
-        $service = TwitterService::getInstance();
+        $service = XService::getInstance();
         
         $this->expectException(SocialMediaException::class);
-        $this->expectExceptionMessage('Failed to get Twitter user info');
+        $this->expectExceptionMessage('Failed to get X (Twitter) user info');
         
         $service->getUserInfo();
     }
@@ -234,13 +234,13 @@ class TwitterServiceTest extends TestCase
     {
         Log::shouldReceive('info')
             ->once()
-            ->with('Twitter post shared successfully', \Mockery::type('array'));
+            ->with('X (Twitter) post shared successfully', \Mockery::type('array'));
 
         Http::fake([
             'https://api.twitter.com/2/tweets' => Http::response(['data' => ['id' => '123']], 200),
         ]);
 
-        $service = TwitterService::getInstance();
+        $service = XService::getInstance();
         $service->share('Test tweet', 'https://example.com');
     }
 
@@ -248,7 +248,7 @@ class TwitterServiceTest extends TestCase
     {
         Log::shouldReceive('error')
             ->once()
-            ->with('Failed to share to Twitter', \Mockery::type('array'));
+            ->with('Failed to share to X (Twitter)', \Mockery::type('array'));
 
         Http::fake([
             'https://api.twitter.com/2/tweets' => Http::response([
@@ -256,7 +256,7 @@ class TwitterServiceTest extends TestCase
             ], 400),
         ]);
 
-        $service = TwitterService::getInstance();
+        $service = XService::getInstance();
         
         $this->expectException(SocialMediaException::class);
         $service->share('Test tweet', 'https://example.com');
@@ -271,7 +271,7 @@ class TwitterServiceTest extends TestCase
                 ->push(['data' => ['id' => '123']], 200),
         ]);
 
-        $service = TwitterService::getInstance();
+        $service = XService::getInstance();
         $result = $service->share('Test tweet', 'https://example.com');
 
         $this->assertArrayHasKey('data', $result);
@@ -285,7 +285,7 @@ class TwitterServiceTest extends TestCase
             'https://api.twitter.com/2/tweets' => Http::response(['data' => ['id' => '456']], 200),
         ]);
 
-        $service = TwitterService::getInstance();
+        $service = XService::getInstance();
         $result = $service->shareVideo('Test video tweet', 'https://example.com/large-video.mp4');
 
         $this->assertArrayHasKey('data', $result);
@@ -300,7 +300,7 @@ class TwitterServiceTest extends TestCase
             'https://api.twitter.com/2/tweets' => Http::response(['data' => ['id' => '123']], 200),
         ]);
 
-        $service = TwitterService::getInstance();
+        $service = XService::getInstance();
         $service->share('Test tweet', 'https://example.com');
 
         Http::assertSent(function ($request) {

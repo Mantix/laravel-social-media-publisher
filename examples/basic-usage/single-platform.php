@@ -9,15 +9,15 @@
 
 require_once __DIR__ . '/../../vendor/autoload.php';
 
+use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 use Mantix\LaravelSocialMediaPublisher\Facades\FaceBook;
-use Mantix\LaravelSocialMediaPublisher\Facades\Twitter;
-use Mantix\LaravelSocialMediaPublisher\Facades\LinkedIn;
 use Mantix\LaravelSocialMediaPublisher\Facades\Instagram;
-use Mantix\LaravelSocialMediaPublisher\Facades\TikTok;
-use Mantix\LaravelSocialMediaPublisher\Facades\YouTube;
+use Mantix\LaravelSocialMediaPublisher\Facades\LinkedIn;
 use Mantix\LaravelSocialMediaPublisher\Facades\Pinterest;
 use Mantix\LaravelSocialMediaPublisher\Facades\Telegram;
-use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
+use Mantix\LaravelSocialMediaPublisher\Facades\TikTok;
+use Mantix\LaravelSocialMediaPublisher\Facades\X;
+use Mantix\LaravelSocialMediaPublisher\Facades\YouTube;
 
 echo "🚀 Laravel Social Media Publisher - Single Platform Examples\n";
 echo "====================================================\n\n";
@@ -45,25 +45,25 @@ try {
 
 echo "\n";
 
-// Example 2: Twitter Publishing
-echo "🐦 Twitter Examples\n";
+// Example 2: X Publishing
+echo "🐦 X Examples\n";
 echo "------------------\n";
 
 try {
     // Basic tweet
-    $result = Twitter::share('Just launched our new feature! 🚀', 'https://example.com/feature');
-    echo "✅ Twitter post created: " . ($result['data']['id'] ?? 'Unknown ID') . "\n";
+    $result = X::share('Just launched our new feature! 🚀', 'https://example.com/feature');
+    echo "✅ X post created: " . ($result['data']['id'] ?? 'Unknown ID') . "\n";
     
     // Tweet with image
-    $result = Twitter::shareImage('Behind the scenes of our development process', 'https://example.com/images/dev.jpg');
-    echo "✅ Twitter image post created: " . ($result['data']['id'] ?? 'Unknown ID') . "\n";
+    $result = X::shareImage('Behind the scenes of our development process', 'https://example.com/images/dev.jpg');
+    echo "✅ X image post created: " . ($result['data']['id'] ?? 'Unknown ID') . "\n";
     
     // Get user timeline
-    $timeline = Twitter::getTimeline(5);
-    echo "✅ Twitter timeline retrieved: " . count($timeline['data'] ?? []) . " tweets\n";
+    $timeline = X::getTimeline(5);
+    echo "✅ X timeline retrieved: " . count($timeline['data'] ?? []) . " tweets\n";
     
 } catch (SocialMediaException $e) {
-    echo "❌ Twitter error: " . $e->getMessage() . "\n";
+    echo "❌ X error: " . $e->getMessage() . "\n";
 }
 
 echo "\n";

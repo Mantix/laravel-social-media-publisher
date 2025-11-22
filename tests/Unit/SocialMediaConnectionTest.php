@@ -2,8 +2,8 @@
 
 namespace Mantix\LaravelSocialMediaPublisher\Tests\Unit;
 
-use Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 use Illuminate\Support\Facades\Crypt;
+use Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 
 class SocialMediaConnectionTest extends TestCase
 {
@@ -42,7 +42,7 @@ class SocialMediaConnectionTest extends TestCase
 
     public function testTokenSecretEncryption()
     {
-        $connection = $this->createTwitterConnection();
+        $connection = $this->createXConnection();
 
         $this->assertNotEquals('test_token_secret', $connection->getAttributes()['token_secret']);
         $this->assertEquals('test_token_secret', $connection->getDecryptedTokenSecret());

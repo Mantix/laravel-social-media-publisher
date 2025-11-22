@@ -20,7 +20,7 @@ echo "📱 Post to Specific Platforms\n";
 echo "-----------------------------\n";
 
 try {
-    $platforms = ['facebook', 'twitter', 'linkedin'];
+    $platforms = ['facebook', 'x', 'linkedin'];
     $result = SocialMedia::share($platforms, 'Exciting news! We just launched our new feature! 🚀', 'https://example.com/feature');
     
     echo "✅ Posted to " . $result['success_count'] . " out of " . $result['total_platforms'] . " platforms\n";
@@ -168,7 +168,7 @@ echo "-------------------------------\n";
 
 try {
     // Try to post to platforms with some potentially failing
-    $platforms = ['facebook', 'twitter', 'nonexistent_platform', 'linkedin'];
+    $platforms = ['facebook', 'x', 'nonexistent_platform', 'linkedin'];
     $result = SocialMedia::share($platforms, 'Testing error handling!', 'https://example.com/test');
     
     echo "📊 Results Summary:\n";
@@ -208,7 +208,7 @@ try {
     $availablePlatforms = $manager->getAvailablePlatforms();
     echo "📋 Available platforms: " . implode(', ', $availablePlatforms) . "\n";
     
-    $testPlatforms = ['facebook', 'twitter', 'linkedin', 'instagram', 'tiktok', 'youtube', 'pinterest', 'telegram', 'nonexistent'];
+    $testPlatforms = ['facebook', 'x', 'linkedin', 'instagram', 'tiktok', 'youtube', 'pinterest', 'telegram', 'nonexistent'];
     
     echo "\n🔍 Platform availability check:\n";
     foreach ($testPlatforms as $platform) {

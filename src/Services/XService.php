@@ -11,13 +11,13 @@ use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 use Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 
 /**
- * Class TwitterService
+ * Class XService
  *
  * Service for publishing to X (Twitter) using API v2 for Tweets and API v1.1 for Media Uploads.
  *
  * @package Mantix\LaravelSocialMediaPublisher\Services
  */
-class TwitterService extends SocialMediaService implements ShareInterface, ShareImagePostInterface, ShareVideoPostInterface {
+class XService extends SocialMediaService implements ShareInterface, ShareImagePostInterface, ShareVideoPostInterface {
     /** @var string OAuth 2.0 Access Token */
     private string $accessToken;
 
@@ -28,7 +28,7 @@ class TwitterService extends SocialMediaService implements ShareInterface, Share
     private const UPLOAD_URL = 'https://upload.twitter.com/1.1/media/upload.json';
 
     /**
-     * TwitterService Constructor.
+     * XService Constructor.
      *
      * @param string $accessToken
      */
@@ -45,7 +45,7 @@ class TwitterService extends SocialMediaService implements ShareInterface, Share
      */
     public static function forConnection(SocialMediaConnection $connection): self {
         if ($connection->platform !== 'twitter' && $connection->platform !== 'x') {
-            throw new SocialMediaException('Connection is not for the Twitter/X platform.');
+            throw new SocialMediaException('Connection is not for the X (Twitter) platform.');
         }
 
         $token = $connection->getDecryptedAccessToken();
@@ -180,7 +180,7 @@ class TwitterService extends SocialMediaService implements ShareInterface, Share
      * @return array
      */
     public function shareUrl(string $caption, string $url): array {
-        // URLs count as 23 characters in Twitter
+        // URLs count as 23 characters in X (Twitter)
         $content = $caption . ' ' . $url;
         // Simple validation (approximation)
         if (mb_strlen($caption) > 257) {

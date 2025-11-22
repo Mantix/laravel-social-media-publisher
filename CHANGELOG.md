@@ -5,6 +5,12 @@ All notable changes to the **Laravel Social Media Publisher** package will be do
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.2] - 2025-11-22
+
+### 🐛 Fixed
+- Renamed Twitter to X everywhere.
+- Renamed FaceBook to Facebook everywhere.
+
 ## [2.1.1] - 2025-11-22
 
 ### 🚀 Added

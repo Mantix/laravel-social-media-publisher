@@ -2,10 +2,10 @@
 
 namespace Mantix\LaravelSocialMediaPublisher\Tests\Unit;
 
-use Mantix\LaravelSocialMediaPublisher\Tests\Unit\TestCase;
-use Mantix\LaravelSocialMediaPublisher\Services\SocialMediaManager;
-use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 use Illuminate\Support\Facades\Http;
+use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
+use Mantix\LaravelSocialMediaPublisher\Services\SocialMediaManager;
+use Mantix\LaravelSocialMediaPublisher\Tests\Unit\TestCase;
 
 class SocialMediaManagerTest extends TestCase
 {
@@ -23,7 +23,7 @@ class SocialMediaManagerTest extends TestCase
 
         $this->assertIsArray($platforms);
         $this->assertContains('facebook', $platforms);
-        $this->assertContains('twitter', $platforms);
+        $this->assertContains('x', $platforms);
         $this->assertContains('linkedin', $platforms);
         $this->assertContains('instagram', $platforms);
         $this->assertContains('tiktok', $platforms);
@@ -35,7 +35,7 @@ class SocialMediaManagerTest extends TestCase
     public function testIsPlatformAvailable()
     {
         $this->assertTrue($this->manager->isPlatformAvailable('facebook'));
-        $this->assertTrue($this->manager->isPlatformAvailable('twitter'));
+        $this->assertTrue($this->manager->isPlatformAvailable('x'));
         $this->assertTrue($this->manager->isPlatformAvailable('linkedin'));
         $this->assertFalse($this->manager->isPlatformAvailable('nonexistent'));
         $this->assertFalse($this->manager->isPlatformAvailable(''));
@@ -46,8 +46,8 @@ class SocialMediaManagerTest extends TestCase
         $facebookService = $this->manager->getPlatformService('facebook');
         $this->assertEquals('mantix\LaravelSocialMediaPublisher\Services\FacebookService', $facebookService);
 
-        $twitterService = $this->manager->getPlatformService('twitter');
-        $this->assertEquals('mantix\LaravelSocialMediaPublisher\Services\TwitterService', $twitterService);
+        $xService = $this->manager->getPlatformService('x');
+        $this->assertEquals('mantix\LaravelSocialMediaPublisher\Services\XService', $xService);
 
         $this->assertNull($this->manager->getPlatformService('nonexistent'));
     }
@@ -60,7 +60,7 @@ class SocialMediaManagerTest extends TestCase
             'https://api.linkedin.com/v2/*' => Http::response(['id' => '789'], 200),
         ]);
 
-        $platforms = ['facebook', 'twitter', 'linkedin'];
+        $platforms = ['facebook', 'x', 'linkedin'];
         $result = $this->manager->share($platforms, 'Test post', 'https://example.com');
 
         $this->assertArrayHasKey('results', $result);
@@ -73,11 +73,11 @@ class SocialMediaManagerTest extends TestCase
         $this->assertEquals(0, $result['error_count']);
 
         $this->assertArrayHasKey('facebook', $result['results']);
-        $this->assertArrayHasKey('twitter', $result['results']);
+        $this->assertArrayHasKey('x', $result['results']);
         $this->assertArrayHasKey('linkedin', $result['results']);
 
         $this->assertTrue($result['results']['facebook']['success']);
-        $this->assertTrue($result['results']['twitter']['success']);
+        $this->assertTrue($result['results']['x']['success']);
         $this->assertTrue($result['results']['linkedin']['success']);
     }
 
@@ -136,7 +136,7 @@ class SocialMediaManagerTest extends TestCase
             'https://api.linkedin.com/v2/*' => Http::response(['id' => '789'], 200),
         ]);
 
-        $platforms = ['facebook', 'twitter', 'linkedin'];
+        $platforms = ['facebook', 'x', 'linkedin'];
         $result = $this->manager->share($platforms, 'Test post', 'https://example.com');
 
         $this->assertEquals(3, $result['total_platforms']);
@@ -144,11 +144,11 @@ class SocialMediaManagerTest extends TestCase
         $this->assertEquals(1, $result['error_count']);
 
         $this->assertTrue($result['results']['facebook']['success']);
-        $this->assertFalse($result['results']['twitter']['success']);
+        $this->assertFalse($result['results']['x']['success']);
         $this->assertTrue($result['results']['linkedin']['success']);
 
-        $this->assertArrayHasKey('twitter', $result['errors']);
-        $this->assertStringContains('Invalid token', $result['errors']['twitter']);
+        $this->assertArrayHasKey('x', $result['errors']);
+        $this->assertStringContains('Invalid token', $result['errors']['x']);
     }
 
     public function testPlatformMethodReturnsService()
@@ -156,8 +156,8 @@ class SocialMediaManagerTest extends TestCase
         $facebookService = $this->manager->platform('facebook');
         $this->assertInstanceOf('mantix\LaravelSocialMediaPublisher\Services\FacebookService', $facebookService);
 
-        $twitterService = $this->manager->platform('twitter');
-        $this->assertInstanceOf('mantix\LaravelSocialMediaPublisher\Services\TwitterService', $twitterService);
+        $xService = $this->manager->platform('x');
+        $this->assertInstanceOf('mantix\LaravelSocialMediaPublisher\Services\XService', $xService);
     }
 
     public function testPlatformMethodWithInvalidPlatform()
@@ -174,10 +174,10 @@ class SocialMediaManagerTest extends TestCase
         $this->assertInstanceOf('mantix\LaravelSocialMediaPublisher\Services\FacebookService', $facebookService);
     }
 
-    public function testTwitterMethod()
+    public function testXMethod()
     {
-        $twitterService = $this->manager->twitter();
-        $this->assertInstanceOf('mantix\LaravelSocialMediaPublisher\Services\TwitterService', $twitterService);
+        $xService = $this->manager->x();
+        $this->assertInstanceOf('mantix\LaravelSocialMediaPublisher\Services\XService', $xService);
     }
 
     public function testLinkedInMethod()
@@ -229,7 +229,7 @@ class SocialMediaManagerTest extends TestCase
 
     public function testExecuteOnPlatformsWithInvalidPlatform()
     {
-        $platforms = ['facebook', 'nonexistent', 'twitter'];
+        $platforms = ['facebook', 'nonexistent', 'x'];
         $result = $this->manager->share($platforms, 'Test post', 'https://example.com');
 
         $this->assertEquals(3, $result['total_platforms']);

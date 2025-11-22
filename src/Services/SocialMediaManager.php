@@ -19,7 +19,7 @@ class SocialMediaManager
      */
     private const PLATFORMS = [
         'facebook' => FacebookService::class,
-        'twitter' => TwitterService::class,
+        'x' => XService::class,
         'linkedin' => LinkedInService::class,
         'instagram' => InstagramService::class,
         'tiktok' => TikTokService::class,
@@ -79,11 +79,11 @@ class SocialMediaManager
     }
 
     /**
-     * Get Twitter service.
+     * Get X service.
      */
-    public function twitter()
+    public function x()
     {
-        return $this->platform('twitter');
+        return $this->platform('x');
     }
 
     /**

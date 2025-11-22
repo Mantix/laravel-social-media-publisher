@@ -12,7 +12,7 @@ use Mantix\LaravelSocialMediaPublisher\Facades\Pinterest;
 use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 use Mantix\LaravelSocialMediaPublisher\Facades\Telegram;
 use Mantix\LaravelSocialMediaPublisher\Facades\TikTok;
-use Mantix\LaravelSocialMediaPublisher\Facades\Twitter;
+use Mantix\LaravelSocialMediaPublisher\Facades\X;
 use Mantix\LaravelSocialMediaPublisher\Facades\YouTube;
 
 class SocialMediaTest extends TestCase
@@ -25,11 +25,11 @@ class SocialMediaTest extends TestCase
         config([
             'social_media_publisher.facebook_access_token' => 'test_facebook_token',
             'social_media_publisher.facebook_page_id' => 'test_page_id',
-            'social_media_publisher.twitter_bearer_token' => 'test_twitter_token',
-            'social_media_publisher.twitter_api_key' => 'test_api_key',
-            'social_media_publisher.twitter_api_secret' => 'test_api_secret',
-            'social_media_publisher.twitter_access_token' => 'test_access_token',
-            'social_media_publisher.twitter_access_token_secret' => 'test_access_token_secret',
+            'social_media_publisher.x_bearer_token' => 'test_x_token',
+            'social_media_publisher.x_api_key' => 'test_api_key',
+            'social_media_publisher.x_api_secret' => 'test_api_secret',
+            'social_media_publisher.x_access_token' => 'test_access_token',
+            'social_media_publisher.x_access_token_secret' => 'test_access_token_secret',
             'social_media_publisher.linkedin_access_token' => 'test_linkedin_token',
             'social_media_publisher.linkedin_person_urn' => 'test_person_urn',
             'social_media_publisher.instagram_access_token' => 'test_instagram_token',
@@ -55,7 +55,7 @@ class SocialMediaTest extends TestCase
             'https://api.linkedin.com/v2/*' => Http::response(['id' => '789'], 200),
         ]);
 
-        $platforms = ['facebook', 'twitter', 'linkedin'];
+        $platforms = ['facebook', 'x', 'linkedin'];
         $result = SocialMedia::share($platforms, 'Test post', 'https://example.com');
 
         $this->assertArrayHasKey('results', $result);
@@ -139,32 +139,32 @@ class SocialMediaTest extends TestCase
         $this->assertEquals('page_impressions', $result['data'][0]['name']);
     }
 
-    public function testTwitterSharing()
+    public function testXSharing()
     {
         Http::fake([
             'https://api.twitter.com/2/*' => Http::response(['data' => ['id' => '456']], 200),
         ]);
 
-        $result = Twitter::share('Test tweet', 'https://example.com');
+        $result = X::share('Test tweet', 'https://example.com');
 
         $this->assertArrayHasKey('data', $result);
         $this->assertEquals('456', $result['data']['id']);
     }
 
-    public function testTwitterImageSharing()
+    public function testXImageSharing()
     {
         Http::fake([
             'https://api.twitter.com/2/*' => Http::response(['data' => ['id' => '456']], 200),
             'https://upload.twitter.com/1.1/*' => Http::response(['media_id_string' => 'media123'], 200),
         ]);
 
-        $result = Twitter::shareImage('Test tweet with image', 'https://example.com/image.jpg');
+        $result = X::shareImage('Test tweet with image', 'https://example.com/image.jpg');
 
         $this->assertArrayHasKey('data', $result);
         $this->assertEquals('456', $result['data']['id']);
     }
 
-    public function testTwitterTimeline()
+    public function testXTimeline()
     {
         Http::fake([
             'https://api.twitter.com/2/*' => Http::response([
@@ -175,7 +175,7 @@ class SocialMediaTest extends TestCase
             ], 200),
         ]);
 
-        $result = Twitter::getTimeline(5);
+        $result = X::getTimeline(5);
 
         $this->assertArrayHasKey('data', $result);
         $this->assertCount(2, $result['data']);
@@ -368,7 +368,7 @@ class SocialMediaTest extends TestCase
             'https://api.linkedin.com/v2/*' => Http::response(['id' => '789'], 200),
         ]);
 
-        $platforms = ['facebook', 'twitter', 'linkedin'];
+        $platforms = ['facebook', 'x', 'linkedin'];
         $result = SocialMedia::share($platforms, 'Test post', 'https://example.com');
 
         $this->assertEquals(3, $result['total_platforms']);
@@ -376,10 +376,10 @@ class SocialMediaTest extends TestCase
         $this->assertEquals(1, $result['error_count']);
 
         $this->assertTrue($result['results']['facebook']['success']);
-        $this->assertFalse($result['results']['twitter']['success']);
+        $this->assertFalse($result['results']['x']['success']);
         $this->assertTrue($result['results']['linkedin']['success']);
 
-        $this->assertArrayHasKey('twitter', $result['errors']);
+        $this->assertArrayHasKey('x', $result['errors']);
     }
 
     public function testPlatformAvailability()
@@ -387,7 +387,7 @@ class SocialMediaTest extends TestCase
         $manager = app(\mantix\LaravelSocialMediaPublisher\Services\SocialMediaManager::class);
         
         $this->assertTrue($manager->isPlatformAvailable('facebook'));
-        $this->assertTrue($manager->isPlatformAvailable('twitter'));
+        $this->assertTrue($manager->isPlatformAvailable('x'));
         $this->assertTrue($manager->isPlatformAvailable('linkedin'));
         $this->assertTrue($manager->isPlatformAvailable('instagram'));
         $this->assertTrue($manager->isPlatformAvailable('tiktok'));
@@ -405,7 +405,7 @@ class SocialMediaTest extends TestCase
         $this->assertIsArray($platforms);
         $this->assertCount(8, $platforms);
         $this->assertContains('facebook', $platforms);
-        $this->assertContains('twitter', $platforms);
+        $this->assertContains('x', $platforms);
         $this->assertContains('linkedin', $platforms);
         $this->assertContains('instagram', $platforms);
         $this->assertContains('tiktok', $platforms);
@@ -430,7 +430,7 @@ class SocialMediaTest extends TestCase
     public function testServiceProviderRegistration()
     {
         $this->assertTrue(app()->bound('mantix\LaravelSocialMediaPublisher\Services\FacebookService'));
-        $this->assertTrue(app()->bound('mantix\LaravelSocialMediaPublisher\Services\TwitterService'));
+        $this->assertTrue(app()->bound('mantix\LaravelSocialMediaPublisher\Services\XService'));
         $this->assertTrue(app()->bound('mantix\LaravelSocialMediaPublisher\Services\LinkedInService'));
         $this->assertTrue(app()->bound('mantix\LaravelSocialMediaPublisher\Services\InstagramService'));
         $this->assertTrue(app()->bound('mantix\LaravelSocialMediaPublisher\Services\TikTokService'));
@@ -443,7 +443,7 @@ class SocialMediaTest extends TestCase
     public function testFacadeAliases()
     {
         $this->assertTrue(app()->bound('facebook'));
-        $this->assertTrue(app()->bound('twitter'));
+        $this->assertTrue(app()->bound('x'));
         $this->assertTrue(app()->bound('linkedin'));
         $this->assertTrue(app()->bound('instagram'));
         $this->assertTrue(app()->bound('tiktok'));
