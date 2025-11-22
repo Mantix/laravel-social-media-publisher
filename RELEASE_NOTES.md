@@ -1,6 +1,8 @@
 # Release Notes
 
-# Release Notes
+## v2.1.1 - Added support for Laravel 12
+
+We added support for Laravel 12.
 
 ## v2.1.0 - The "Omnichannel" Release 🚀
 
