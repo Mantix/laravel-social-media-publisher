@@ -34,13 +34,22 @@ class FacebookService extends SocialMediaService implements ShareInterface, Shar
 
     /**
      * FacebookService constructor.
-     *
+     */
+    public function __construct() {
+        // Empty constructor
+    }
+
+    /**
+     * Set the credentials for the FacebookService.
      * @param string $accessToken
      * @param string|null $pageId
+     * @return self
      */
-    public function __construct(string $accessToken, ?string $pageId = null) {
+    public function setCredentials(string $accessToken, ?string $pageId = null): self {
         $this->accessToken = $accessToken;
         $this->pageId = $pageId;
+        
+        return $this;
     }
 
     /**

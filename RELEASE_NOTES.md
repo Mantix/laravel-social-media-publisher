@@ -1,5 +1,70 @@
 # Release Notes
 
+## v2.1.3 - Service Architecture Refactoring (November 23, 2025)
+
+### 🔄 What's Changed
+
+We've refactored all platform services to improve code clarity and maintainability by separating credential setting from constructor initialization.
+
+#### Service Constructor Changes
+
+All platform services now have **empty constructors** and require credentials to be set via the `setCredentials()` method:
+
+**Affected Services:**
+- `LinkedInService`
+- `FacebookService`
+- `XService` (formerly TwitterService)
+- `InstagramService`
+- `TikTokService`
+- `YouTubeService`
+- `PinterestService`
+- `TelegramService`
+
+#### Before (v2.1.2 and earlier):
+```php
+$service = new LinkedInService($accessToken, $authorUrn);
+$service->shareText('Hello LinkedIn!');
+```
+
+#### After (v2.1.3+):
+```php
+$service = new LinkedInService();
+$service->setCredentials($accessToken, $authorUrn);
+$service->shareText('Hello LinkedIn!');
+```
+
+### ✅ No Breaking Changes for Most Users
+
+If you're using the recommended patterns, **no code changes are required**:
+
+- ✅ `forConnection()` method - Works exactly as before
+- ✅ `SocialMedia::platform()` factory - Works exactly as before
+- ✅ All facades - Work exactly as before
+
+These methods handle credential setting internally, so your existing code continues to work without modification.
+
+### 📝 When You Need to Update
+
+Only update your code if you're **manually instantiating services** with constructor parameters:
+
+```php
+// Update this pattern:
+$service = new LinkedInService($token, $urn);
+
+// To this:
+$service = new LinkedInService();
+$service->setCredentials($token, $urn);
+```
+
+### 🎯 Benefits
+
+- **Clearer API**: Separation of instantiation and credential setting makes the code more readable
+- **Better Testability**: Easier to create mock services without requiring credentials in constructors
+- **Consistent Pattern**: All services now follow the same initialization pattern
+- **Flexibility**: Allows for more flexible service configuration
+
+---
+
 ## v2.1.2 - Renamed Facades
 
 We renamed Twitter to X and FaceBook to Facebook everywhere.

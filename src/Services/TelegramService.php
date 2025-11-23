@@ -30,13 +30,22 @@ class TelegramService extends SocialMediaService implements ShareInterface, Shar
 
     /**
      * TelegramService Constructor.
+     */
+    public function __construct() {
+        // Empty constructor
+    }
+
+    /**
+     * Set the credentials for the TelegramService.
      *
      * @param string $botToken
      * @param string $chatId
+     * @return self
      */
-    public function __construct(string $botToken, string $chatId) {
+    public function setCredentials(string $botToken, string $chatId): self {
         $this->botToken = $botToken;
         $this->chatId = $chatId;
+        return $this;
     }
 
     /**

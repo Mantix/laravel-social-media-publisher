@@ -25,11 +25,20 @@ class TikTokService extends SocialMediaService implements ShareInterface, ShareV
 
     /**
      * TikTokService constructor.
-     *
-     * @param string $accessToken
      */
-    public function __construct(string $accessToken) {
+    public function __construct() {
+        // Empty constructor
+    }
+
+    /**
+     * Set the credentials for the TikTokService.
+     * 
+     * @param string $accessToken
+     * @return self
+     */
+    public function setCredentials(string $accessToken): self {
         $this->accessToken = $accessToken;
+        return $this;
     }
 
     /**

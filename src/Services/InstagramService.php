@@ -32,13 +32,22 @@ class InstagramService extends SocialMediaService implements ShareInterface, Sha
 
     /**
      * InstagramService Constructor.
-     *
+     */
+    public function __construct() {
+        // Empty constructor
+    }
+
+    /**
+     * Set the credentials for the InstagramService.
+     * 
      * @param string $accessToken
      * @param string $accountId
+     * @return self
      */
-    public function __construct(string $accessToken, string $accountId) {
+    public function setCredentials(string $accessToken, string $accountId): self {
         $this->accessToken = $accessToken;
         $this->accountId = $accountId;
+        return $this;
     }
 
     /**

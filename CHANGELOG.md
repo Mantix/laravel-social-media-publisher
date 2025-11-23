@@ -5,6 +5,27 @@ All notable changes to the **Laravel Social Media Publisher** package will be do
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.3] - 2025-11-23
+
+### 🔄 Changed
+- **Service Architecture**: Refactored all platform services to separate credential setting from constructor initialization.
+  - All service constructors are now parameterless (empty constructors).
+  - Credentials must be set using the `setCredentials()` method after instantiation.
+  - This change affects: `LinkedInService`, `FacebookService`, `XService`, `InstagramService`, `TikTokService`, `YouTubeService`, `PinterestService`, and `TelegramService`.
+  - The `forConnection()` static method continues to work as before and handles credential setting internally.
+
+### 📝 Migration Notes
+- **No breaking changes for most users**: If you're using `forConnection()` or `SocialMedia::platform()`, no changes are required.
+- **Manual instantiation**: If you manually instantiate services, you must now call `setCredentials()` after construction:
+  ```php
+  // Before (v2.1.2 and earlier)
+  $service = new LinkedInService($token, $urn);
+  
+  // After (v2.1.3+)
+  $service = new LinkedInService();
+  $service->setCredentials($token, $urn);
+  ```
+
 ## [2.1.2] - 2025-11-22
 
 ### 🐛 Fixed

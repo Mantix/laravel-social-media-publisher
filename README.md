@@ -292,6 +292,25 @@ try {
 }
 ```
 
+### Manual Service Instantiation
+
+If you need to manually instantiate a service (instead of using `forConnection()` or `SocialMedia::platform()`), you must call `setCredentials()` after construction:
+
+```php
+use Mantix\LaravelSocialMediaPublisher\Services\LinkedInService;
+
+// Create instance
+$linkedin = new LinkedInService();
+
+// Set credentials
+$linkedin->setCredentials($accessToken, $authorUrn);
+
+// Now you can use the service
+$linkedin->shareText('Hello LinkedIn!');
+```
+
+**Note:** The recommended approach is to use `forConnection()` or `SocialMedia::platform()`, which handle credential setting automatically.
+
 -----
 
 ## 📄 License

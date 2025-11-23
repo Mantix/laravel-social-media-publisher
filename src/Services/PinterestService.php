@@ -29,13 +29,22 @@ class PinterestService extends SocialMediaService implements ShareInterface, Sha
 
     /**
      * PinterestService constructor.
+     */
+    public function __construct() {
+        // Empty constructor
+    }
+
+    /**
+     * Set the credentials for the PinterestService.
      *
      * @param string $accessToken
      * @param string|null $defaultBoardId
+     * @return self
      */
-    public function __construct(string $accessToken, ?string $defaultBoardId = null) {
+    public function setCredentials(string $accessToken, ?string $defaultBoardId = null): self {
         $this->accessToken = $accessToken;
         $this->defaultBoardId = $defaultBoardId;
+        return $this;
     }
 
     /**

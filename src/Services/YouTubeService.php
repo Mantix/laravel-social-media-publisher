@@ -28,11 +28,20 @@ class YouTubeService extends SocialMediaService implements ShareInterface, Share
 
     /**
      * YouTubeService Constructor.
-     *
-     * @param string $accessToken
      */
-    public function __construct(string $accessToken) {
+    public function __construct() {
+        // Empty constructor
+    }
+
+    /**
+     * Set the credentials for the YouTubeService.
+     * 
+     * @param string $accessToken
+     * @return self
+     */
+    public function setCredentials(string $accessToken): self {
         $this->accessToken = $accessToken;
+        return $this;
     }
 
     /**

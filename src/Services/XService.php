@@ -29,13 +29,22 @@ class XService extends SocialMediaService implements ShareInterface, ShareImageP
 
     /**
      * XService Constructor.
-     *
-     * @param string $accessToken
      */
-    public function __construct(string $accessToken) {
-        $this->accessToken = $accessToken;
+    public function __construct() {
+        // Empty constructor
     }
-
+    
+    /**
+     * Set the credentials for the XService.
+     * 
+     * @param string $accessToken
+     * @return self
+     */
+    public function setCredentials(string $accessToken): self {
+        $this->accessToken = $accessToken;
+        return $this;
+    }
+    
     /**
      * Create a new instance from a SocialMediaConnection.
      *

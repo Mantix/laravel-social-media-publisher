@@ -30,13 +30,24 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
 
     /**
      * LinkedInService Constructor.
+     * 
+     * @return self
+     */
+    public function __construct() {
+        // Empty constructor
+    }
+
+    /**
+     * Set the credentials for the LinkedInService.
      *
      * @param string $accessToken
      * @param string $authorUrn The URN of the entity authoring the post.
+     * @return self
      */
-    public function __construct(string $accessToken, string $authorUrn) {
+    public function setCredentials(string $accessToken, string $authorUrn): self {
         $this->accessToken = $accessToken;
         $this->authorUrn = $authorUrn;
+        return $this;
     }
 
     /**
