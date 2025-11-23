@@ -17,13 +17,11 @@ use Mantix\LaravelSocialMediaPublisher\Services\XService;
  * Handles OAuth callbacks from social media platforms.
  * This controller can be extended or replaced by publishing it to your app.
  */
-class OAuthController
-{
+class OAuthController {
     /**
      * Handle Facebook OAuth callback.
      */
-    public function handleFacebookCallback(Request $request)
-    {
+    public function handleFacebookCallback(Request $request) {
         $code = $request->get('code');
         $error = $request->get('error');
         
@@ -85,8 +83,7 @@ class OAuthController
     /**
      * Handle LinkedIn OAuth callback.
      */
-    public function handleLinkedInCallback(Request $request)
-    {
+    public function handleLinkedInCallback(Request $request) {
         $code = $request->get('code');
         $error = $request->get('error');
         
@@ -153,8 +150,7 @@ class OAuthController
     /**
      * Handle X (Twitter) OAuth callback.
      */
-    public function handleXCallback(Request $request)
-    {
+    public function handleXCallback(Request $request) {
         $code = $request->get('code');
         $error = $request->get('error');
         
@@ -232,8 +228,7 @@ class OAuthController
     /**
      * Handle Instagram OAuth callback.
      */
-    public function handleInstagramCallback(Request $request)
-    {
+    public function handleInstagramCallback(Request $request) {
         $code = $request->get('code');
         $error = $request->get('error');
         
@@ -294,8 +289,7 @@ class OAuthController
     /**
      * Handle TikTok OAuth callback.
      */
-    public function handleTikTokCallback(Request $request)
-    {
+    public function handleTikTokCallback(Request $request) {
         // TODO: Implement when TikTok OAuth is implemented
         return $this->handleError('tiktok', 'not_implemented', 'TikTok OAuth callback is not yet implemented');
     }
@@ -303,8 +297,7 @@ class OAuthController
     /**
      * Handle YouTube OAuth callback.
      */
-    public function handleYouTubeCallback(Request $request)
-    {
+    public function handleYouTubeCallback(Request $request) {
         // TODO: Implement when YouTube OAuth is implemented
         return $this->handleError('youtube', 'not_implemented', 'YouTube OAuth callback is not yet implemented');
     }
@@ -312,8 +305,7 @@ class OAuthController
     /**
      * Handle Pinterest OAuth callback.
      */
-    public function handlePinterestCallback(Request $request)
-    {
+    public function handlePinterestCallback(Request $request) {
         // TODO: Implement when Pinterest OAuth is implemented
         return $this->handleError('pinterest', 'not_implemented', 'Pinterest OAuth callback is not yet implemented');
     }
@@ -321,8 +313,7 @@ class OAuthController
     /**
      * Handle successful OAuth connection.
      */
-    protected function handleSuccess(string $platform, string $message)
-    {
+    protected function handleSuccess(string $platform, string $message) {
         // You can customize this redirect based on your application's needs
         $redirectRoute = config('social_media_publisher.oauth_redirect_route', 'dashboard');
         
@@ -332,8 +323,7 @@ class OAuthController
     /**
      * Handle OAuth errors.
      */
-    protected function handleError(string $platform, string $error, ?string $description = null)
-    {
+    protected function handleError(string $platform, string $error, ?string $description = null) {
         $message = "Failed to connect {$platform}: " . ($description ?? $error);
         
         if (config('social_media_publisher.enable_logging', true)) {

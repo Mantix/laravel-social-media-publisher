@@ -83,7 +83,9 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
             $urn = str_starts_with($id, 'urn:li:person:') ? $id : "urn:li:person:{$id}";
         }
 
-        return new self($token, $urn);
+        $service = new self();
+        $service->setCredentials($token, $urn);
+        return $service;
     }
 
     /**
@@ -146,10 +148,36 @@ class LinkedInService extends SocialMediaService implements ShareInterface, Shar
 
         // Immediately fetch the user's profile ID (Person URN) to return with the token
         // We create a temporary instance just to fetch the ID
-        $tempService = new self($data['access_token'], 'urn:li:unknown');
+        $tempService = new self();
+        $tempService->setCredentials($data['access_token'], 'urn:li:unknown');
         $profile = $tempService->getUserProfile();
 
         return array_merge($data, ['profile' => $profile]);
+    }
+
+    /**
+     * Revoke an access token and disconnect from LinkedIn.
+     *
+     * @param string $accessToken
+     * @return bool
+     * @throws SocialMediaException
+     */
+    public static function disconnect(string $accessToken): bool {
+        $clientId = config('social_media_publisher.linkedin_client_id');
+        $clientSecret = config('social_media_publisher.linkedin_client_secret');
+
+        if (!$clientId || !$clientSecret) {
+            throw new SocialMediaException('LinkedIn Client ID and Secret are required for token revocation.');
+        }
+
+        $response = Http::asForm()->withBasicAuth($clientId, $clientSecret)
+            ->post('https://www.linkedin.com/oauth/v2/revoke', [
+                'token' => $accessToken,
+            ]);
+
+        // LinkedIn returns 200 on success, but also returns 200 if token is already invalid
+        // So we consider it successful if we get 200 or 400 (invalid token)
+        return $response->status() === 200 || $response->status() === 400;
     }
 
     /* --------------------------------------------------------------------------

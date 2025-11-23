@@ -6,8 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\Crypt;
 
-class SocialMediaConnection extends Model
-{
+class SocialMediaConnection extends Model {
     /**
      * The table associated with the model.
      *
@@ -50,8 +49,7 @@ class SocialMediaConnection extends Model
      * Get the owner of the connection (polymorphic relationship).
      * Can be User, Company, or any other model.
      */
-    public function owner(): MorphTo
-    {
+    public function owner(): MorphTo {
         return $this->morphTo();
     }
 
@@ -60,8 +58,7 @@ class SocialMediaConnection extends Model
      *
      * @return string|null
      */
-    public function getDecryptedAccessToken(): ?string
-    {
+    public function getDecryptedAccessToken(): ?string {
         return $this->access_token ? Crypt::decryptString($this->access_token) : null;
     }
 
@@ -70,8 +67,7 @@ class SocialMediaConnection extends Model
      *
      * @return string|null
      */
-    public function getDecryptedRefreshToken(): ?string
-    {
+    public function getDecryptedRefreshToken(): ?string {
         return $this->refresh_token ? Crypt::decryptString($this->refresh_token) : null;
     }
 
@@ -80,8 +76,7 @@ class SocialMediaConnection extends Model
      *
      * @return string|null
      */
-    public function getDecryptedTokenSecret(): ?string
-    {
+    public function getDecryptedTokenSecret(): ?string {
         return $this->token_secret ? Crypt::decryptString($this->token_secret) : null;
     }
 
@@ -91,8 +86,7 @@ class SocialMediaConnection extends Model
      * @param string|null $value
      * @return void
      */
-    public function setAccessTokenAttribute(?string $value): void
-    {
+    public function setAccessTokenAttribute(?string $value): void {
         $this->attributes['access_token'] = $value ? Crypt::encryptString($value) : null;
     }
 
@@ -102,8 +96,7 @@ class SocialMediaConnection extends Model
      * @param string|null $value
      * @return void
      */
-    public function setRefreshTokenAttribute(?string $value): void
-    {
+    public function setRefreshTokenAttribute(?string $value): void {
         $this->attributes['refresh_token'] = $value ? Crypt::encryptString($value) : null;
     }
 
@@ -113,8 +106,7 @@ class SocialMediaConnection extends Model
      * @param string|null $value
      * @return void
      */
-    public function setTokenSecretAttribute(?string $value): void
-    {
+    public function setTokenSecretAttribute(?string $value): void {
         $this->attributes['token_secret'] = $value ? Crypt::encryptString($value) : null;
     }
 
@@ -123,8 +115,7 @@ class SocialMediaConnection extends Model
      *
      * @return bool
      */
-    public function isExpired(): bool
-    {
+    public function isExpired(): bool {
         if (!$this->expires_at) {
             return false; // No expiration set
         }
@@ -138,8 +129,7 @@ class SocialMediaConnection extends Model
      * @param \Illuminate\Database\Eloquent\Builder $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopeActive($query)
-    {
+    public function scopeActive($query) {
         return $query->where('is_active', true);
     }
 
@@ -150,8 +140,7 @@ class SocialMediaConnection extends Model
      * @param string $platform
      * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopeForPlatform($query, string $platform)
-    {
+    public function scopeForPlatform($query, string $platform) {
         return $query->where('platform', $platform);
     }
 
@@ -163,8 +152,7 @@ class SocialMediaConnection extends Model
      * @param int|null $ownerId Optional owner ID if passing class name
      * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopeForOwner($query, $owner, ?int $ownerId = null)
-    {
+    public function scopeForOwner($query, $owner, ?int $ownerId = null) {
         if (is_object($owner)) {
             return $query->where('owner_type', get_class($owner))
                 ->where('owner_id', $owner->id);
@@ -172,6 +160,57 @@ class SocialMediaConnection extends Model
 
         return $query->where('owner_type', $owner)
             ->where('owner_id', $ownerId);
+    }
+
+    /**
+     * Disconnect this social media connection.
+     * Revokes the access token on the platform and deletes the connection record.
+     *
+     * @param bool $revokeToken Whether to attempt token revocation on the platform (default: true)
+     * @return bool True if disconnection was successful, false otherwise
+     * @throws \Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException
+     */
+    public function disconnect(bool $revokeToken = true): bool {
+        $platform = $this->platform;
+        $serviceClass = $this->getServiceClassForPlatform($platform);
+
+        // Attempt to revoke token on platform if requested
+        if ($revokeToken && $serviceClass) {
+            try {
+                $token = $this->getDecryptedAccessToken();
+                if ($token) {
+                    $serviceClass::disconnect($token);
+                }
+            } catch (\Exception $e) {
+                // Log but don't fail - token might already be revoked or invalid
+                \Illuminate\Support\Facades\Log::warning("Failed to revoke token for {$platform} connection: " . $e->getMessage());
+            }
+        }
+
+        // Delete the connection record
+        return $this->delete();
+    }
+
+    /**
+     * Get the service class name for a platform.
+     *
+     * @param string $platform
+     * @return string|null
+     */
+    private function getServiceClassForPlatform(string $platform): ?string {
+        $services = [
+            'facebook' => \Mantix\LaravelSocialMediaPublisher\Services\FacebookService::class,
+            'x' => \Mantix\LaravelSocialMediaPublisher\Services\XService::class,
+            'twitter' => \Mantix\LaravelSocialMediaPublisher\Services\XService::class,
+            'linkedin' => \Mantix\LaravelSocialMediaPublisher\Services\LinkedInService::class,
+            'instagram' => \Mantix\LaravelSocialMediaPublisher\Services\InstagramService::class,
+            'tiktok' => \Mantix\LaravelSocialMediaPublisher\Services\TikTokService::class,
+            'youtube' => \Mantix\LaravelSocialMediaPublisher\Services\YouTubeService::class,
+            'pinterest' => \Mantix\LaravelSocialMediaPublisher\Services\PinterestService::class,
+            'telegram' => \Mantix\LaravelSocialMediaPublisher\Services\TelegramService::class,
+        ];
+
+        return $services[$platform] ?? null;
     }
 }
 

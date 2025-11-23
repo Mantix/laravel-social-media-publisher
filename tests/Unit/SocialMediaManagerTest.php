@@ -7,18 +7,15 @@ use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 use Mantix\LaravelSocialMediaPublisher\Services\SocialMediaManager;
 use Mantix\LaravelSocialMediaPublisher\Tests\Unit\TestCase;
 
-class SocialMediaManagerTest extends TestCase
-{
+class SocialMediaManagerTest extends TestCase {
     protected SocialMediaManager $manager;
 
-    protected function setUp(): void
-    {
+    protected function setUp(): void {
         parent::setUp();
         $this->manager = new SocialMediaManager();
     }
 
-    public function testGetAvailablePlatforms()
-    {
+    public function testGetAvailablePlatforms() {
         $platforms = $this->manager->getAvailablePlatforms();
 
         $this->assertIsArray($platforms);
@@ -32,8 +29,7 @@ class SocialMediaManagerTest extends TestCase
         $this->assertContains('telegram', $platforms);
     }
 
-    public function testIsPlatformAvailable()
-    {
+    public function testIsPlatformAvailable() {
         $this->assertTrue($this->manager->isPlatformAvailable('facebook'));
         $this->assertTrue($this->manager->isPlatformAvailable('x'));
         $this->assertTrue($this->manager->isPlatformAvailable('linkedin'));
@@ -41,8 +37,7 @@ class SocialMediaManagerTest extends TestCase
         $this->assertFalse($this->manager->isPlatformAvailable(''));
     }
 
-    public function testGetPlatformService()
-    {
+    public function testGetPlatformService() {
         $facebookService = $this->manager->getPlatformService('facebook');
         $this->assertEquals('mantix\LaravelSocialMediaPublisher\Services\FacebookService', $facebookService);
 
@@ -52,8 +47,7 @@ class SocialMediaManagerTest extends TestCase
         $this->assertNull($this->manager->getPlatformService('nonexistent'));
     }
 
-    public function testShareToMultiplePlatforms()
-    {
+    public function testShareToMultiplePlatforms() {
         Http::fake([
             'https://graph.facebook.com/v20.0/*' => Http::response(['id' => '123'], 200),
             'https://api.twitter.com/2/*' => Http::response(['data' => ['id' => '456']], 200),
@@ -81,8 +75,7 @@ class SocialMediaManagerTest extends TestCase
         $this->assertTrue($result['results']['linkedin']['success']);
     }
 
-    public function testShareToAllPlatforms()
-    {
+    public function testShareToAllPlatforms() {
         Http::fake([
             'https://graph.facebook.com/v20.0/*' => Http::response(['id' => '123'], 200),
             'https://api.telegram.org/bot*' => Http::response(['ok' => true], 200),
@@ -98,8 +91,7 @@ class SocialMediaManagerTest extends TestCase
         $this->assertGreaterThan(0, $result['success_count']);
     }
 
-    public function testShareImageToMultiplePlatforms()
-    {
+    public function testShareImageToMultiplePlatforms() {
         Http::fake([
             'https://graph.facebook.com/v20.0/*' => Http::response(['id' => '123'], 200),
             'https://api.pinterest.com/v5/*' => Http::response(['id' => '456'], 200),
@@ -113,8 +105,7 @@ class SocialMediaManagerTest extends TestCase
         $this->assertEquals(2, $result['total_platforms']);
     }
 
-    public function testShareVideoToMultiplePlatforms()
-    {
+    public function testShareVideoToMultiplePlatforms() {
         Http::fake([
             'https://graph.facebook.com/v20.0/*' => Http::response(['id' => '123'], 200),
             'https://open-api.tiktok.com/*' => Http::response(['data' => ['video_id' => '456']], 200),
@@ -128,8 +119,7 @@ class SocialMediaManagerTest extends TestCase
         $this->assertEquals(2, $result['total_platforms']);
     }
 
-    public function testShareWithErrors()
-    {
+    public function testShareWithErrors() {
         Http::fake([
             'https://graph.facebook.com/v20.0/*' => Http::response(['id' => '123'], 200),
             'https://api.twitter.com/2/*' => Http::response(['error' => ['message' => 'Invalid token']], 401),
@@ -151,8 +141,7 @@ class SocialMediaManagerTest extends TestCase
         $this->assertStringContains('Invalid token', $result['errors']['x']);
     }
 
-    public function testPlatformMethodReturnsService()
-    {
+    public function testPlatformMethodReturnsService() {
         $facebookService = $this->manager->platform('facebook');
         $this->assertInstanceOf('mantix\LaravelSocialMediaPublisher\Services\FacebookService', $facebookService);
 
@@ -160,64 +149,54 @@ class SocialMediaManagerTest extends TestCase
         $this->assertInstanceOf('mantix\LaravelSocialMediaPublisher\Services\XService', $xService);
     }
 
-    public function testPlatformMethodWithInvalidPlatform()
-    {
+    public function testPlatformMethodWithInvalidPlatform() {
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage("Platform 'nonexistent' is not supported");
 
         $this->manager->platform('nonexistent');
     }
 
-    public function testFacebookMethod()
-    {
+    public function testFacebookMethod() {
         $facebookService = $this->manager->facebook();
         $this->assertInstanceOf('mantix\LaravelSocialMediaPublisher\Services\FacebookService', $facebookService);
     }
 
-    public function testXMethod()
-    {
+    public function testXMethod() {
         $xService = $this->manager->x();
         $this->assertInstanceOf('mantix\LaravelSocialMediaPublisher\Services\XService', $xService);
     }
 
-    public function testLinkedInMethod()
-    {
+    public function testLinkedInMethod() {
         $linkedinService = $this->manager->linkedin();
         $this->assertInstanceOf('mantix\LaravelSocialMediaPublisher\Services\LinkedInService', $linkedinService);
     }
 
-    public function testInstagramMethod()
-    {
+    public function testInstagramMethod() {
         $instagramService = $this->manager->instagram();
         $this->assertInstanceOf('mantix\LaravelSocialMediaPublisher\Services\InstagramService', $instagramService);
     }
 
-    public function testTikTokMethod()
-    {
+    public function testTikTokMethod() {
         $tiktokService = $this->manager->tiktok();
         $this->assertInstanceOf('mantix\LaravelSocialMediaPublisher\Services\TikTokService', $tiktokService);
     }
 
-    public function testYouTubeMethod()
-    {
+    public function testYouTubeMethod() {
         $youtubeService = $this->manager->youtube();
         $this->assertInstanceOf('mantix\LaravelSocialMediaPublisher\Services\YouTubeService', $youtubeService);
     }
 
-    public function testPinterestMethod()
-    {
+    public function testPinterestMethod() {
         $pinterestService = $this->manager->pinterest();
         $this->assertInstanceOf('mantix\LaravelSocialMediaPublisher\Services\PinterestService', $pinterestService);
     }
 
-    public function testTelegramMethod()
-    {
+    public function testTelegramMethod() {
         $telegramService = $this->manager->telegram();
         $this->assertInstanceOf('mantix\LaravelSocialMediaPublisher\Services\TelegramService', $telegramService);
     }
 
-    public function testExecuteOnPlatformsWithEmptyArray()
-    {
+    public function testExecuteOnPlatformsWithEmptyArray() {
         $result = $this->manager->share([], 'Test post', 'https://example.com');
 
         $this->assertEquals(0, $result['total_platforms']);
@@ -227,8 +206,7 @@ class SocialMediaManagerTest extends TestCase
         $this->assertEmpty($result['errors']);
     }
 
-    public function testExecuteOnPlatformsWithInvalidPlatform()
-    {
+    public function testExecuteOnPlatformsWithInvalidPlatform() {
         $platforms = ['facebook', 'nonexistent', 'x'];
         $result = $this->manager->share($platforms, 'Test post', 'https://example.com');
 

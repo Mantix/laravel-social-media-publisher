@@ -5,18 +5,15 @@ namespace Mantix\LaravelSocialMediaPublisher\Tests\Helpers;
 use Illuminate\Support\Facades\Crypt;
 use Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 
-trait TestHelpers
-{
+trait TestHelpers {
     /**
      * Create a mock user for testing.
      */
-    protected function createTestUser($id = 1)
-    {
+    protected function createTestUser($id = 1) {
         return new class($id) {
             public $id;
             
-            public function __construct($id)
-            {
+            public function __construct($id) {
                 $this->id = $id;
             }
         };
@@ -25,13 +22,11 @@ trait TestHelpers
     /**
      * Create a mock company for testing.
      */
-    protected function createTestCompany($id = 1)
-    {
+    protected function createTestCompany($id = 1) {
         return new class($id) {
             public $id;
             
-            public function __construct($id)
-            {
+            public function __construct($id) {
                 $this->id = $id;
             }
         };
@@ -40,8 +35,7 @@ trait TestHelpers
     /**
      * Create a SocialMediaConnection for testing.
      */
-    protected function createConnection(array $attributes = []): SocialMediaConnection
-    {
+    protected function createConnection(array $attributes = []): SocialMediaConnection {
         $defaults = [
             'owner_id' => 1,
             'owner_type' => 'App\Models\User',
@@ -89,8 +83,7 @@ trait TestHelpers
     /**
      * Create a Facebook connection.
      */
-    protected function createFacebookConnection($owner = null, array $attributes = []): SocialMediaConnection
-    {
+    protected function createFacebookConnection($owner = null, array $attributes = []): SocialMediaConnection {
         if ($owner === null) {
             $owner = $this->createTestUser();
         }
@@ -108,8 +101,7 @@ trait TestHelpers
     /**
      * Create a LinkedIn connection.
      */
-    protected function createLinkedInConnection($owner = null, array $attributes = []): SocialMediaConnection
-    {
+    protected function createLinkedInConnection($owner = null, array $attributes = []): SocialMediaConnection {
         if ($owner === null) {
             $owner = $this->createTestUser();
         }
@@ -127,8 +119,7 @@ trait TestHelpers
     /**
      * Create a X connection.
      */
-    protected function createXConnection($owner = null, array $attributes = []): SocialMediaConnection
-    {
+    protected function createXConnection($owner = null, array $attributes = []): SocialMediaConnection {
         if ($owner === null) {
             $owner = $this->createTestUser();
         }
@@ -158,8 +149,7 @@ trait TestHelpers
     /**
      * Create an Instagram connection.
      */
-    protected function createInstagramConnection($owner = null, array $attributes = []): SocialMediaConnection
-    {
+    protected function createInstagramConnection($owner = null, array $attributes = []): SocialMediaConnection {
         if ($owner === null) {
             $owner = $this->createTestUser();
         }
@@ -180,8 +170,7 @@ trait TestHelpers
     /**
      * Create a TikTok connection.
      */
-    protected function createTikTokConnection($owner = null, array $attributes = []): SocialMediaConnection
-    {
+    protected function createTikTokConnection($owner = null, array $attributes = []): SocialMediaConnection {
         if ($owner === null) {
             $owner = $this->createTestUser();
         }
@@ -202,8 +191,7 @@ trait TestHelpers
     /**
      * Create a YouTube connection.
      */
-    protected function createYouTubeConnection($owner = null, array $attributes = []): SocialMediaConnection
-    {
+    protected function createYouTubeConnection($owner = null, array $attributes = []): SocialMediaConnection {
         if ($owner === null) {
             $owner = $this->createTestUser();
         }
@@ -224,8 +212,7 @@ trait TestHelpers
     /**
      * Create a Pinterest connection.
      */
-    protected function createPinterestConnection($owner = null, array $attributes = []): SocialMediaConnection
-    {
+    protected function createPinterestConnection($owner = null, array $attributes = []): SocialMediaConnection {
         if ($owner === null) {
             $owner = $this->createTestUser();
         }

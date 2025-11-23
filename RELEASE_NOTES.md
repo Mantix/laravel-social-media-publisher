@@ -1,5 +1,102 @@
 # Release Notes
 
+## v2.1.4 - Disconnect Functionality (November 23, 2025)
+
+### 🚀 What's New
+
+We've added comprehensive disconnect functionality that allows users to properly revoke access tokens and disconnect their social media accounts.
+
+#### Disconnect Methods
+
+All platform services now support token revocation and disconnection:
+
+**Via Connection Model (Recommended):**
+```php
+use Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
+
+$connection = SocialMediaConnection::where('platform', 'linkedin')
+    ->where('owner_id', $user->id)
+    ->first();
+
+// Disconnect (revokes token on platform and deletes connection)
+$connection->disconnect();
+
+// Or disconnect without revoking token (just delete local record)
+$connection->disconnect(revokeToken: false);
+```
+
+**Via Service/Facade:**
+```php
+use Mantix\LaravelSocialMediaPublisher\Facades\LinkedIn;
+
+// Revoke token on platform only
+LinkedIn::disconnect($accessToken);
+```
+
+### ✅ Features
+
+- **Platform-Specific Revocation**: Each platform uses its proper OAuth revocation endpoint
+- **Graceful Error Handling**: Handles already-revoked or invalid tokens without throwing errors
+- **Connection Cleanup**: Automatically deletes connection records from database
+- **Flexible Options**: Can revoke token on platform, delete local record, or both
+
+### 🔧 Platform Support
+
+| Platform | Token Revocation | Notes |
+|----------|-----------------|-------|
+| **Facebook** | ✅ Yes | Uses Graph API DELETE endpoint |
+| **Instagram** | ✅ Yes | Uses Facebook OAuth (same as Facebook) |
+| **LinkedIn** | ✅ Yes | Uses OAuth v2 revocation endpoint |
+| **X (Twitter)** | ✅ Yes | Uses OAuth 2.0 revocation endpoint |
+| **YouTube** | ✅ Yes | Uses Google OAuth revocation endpoint |
+| **TikTok** | ✅ Yes | Uses TikTok API v2 revocation endpoint |
+| **Pinterest** | ✅ Yes | Uses Pinterest API v5 DELETE endpoint |
+| **Telegram** | ⚠️ N/A | Bot API doesn't support token revocation |
+
+### 📝 Usage Examples
+
+#### Disconnect a Specific Connection
+```php
+$user = User::find(1);
+$connection = $user->getSocialConnection('linkedin');
+
+if ($connection) {
+    $connection->disconnect();
+    // Token revoked on LinkedIn and connection deleted from database
+}
+```
+
+#### Disconnect All Connections for a User
+```php
+$user = User::find(1);
+
+foreach ($user->social_media_connections as $connection) {
+    $connection->disconnect();
+}
+```
+
+#### Revoke Token Without Deleting Connection
+```php
+use Mantix\LaravelSocialMediaPublisher\Facades\LinkedIn;
+
+$connection = SocialMediaConnection::find($connectionId);
+$token = $connection->getDecryptedAccessToken();
+
+// Revoke token on platform
+LinkedIn::disconnect($token);
+
+// Connection record remains in database (you can delete it manually if needed)
+```
+
+### 🎯 Benefits
+
+- **Security**: Properly revokes tokens on platform side, not just locally
+- **User Control**: Users can disconnect their accounts at any time
+- **Data Hygiene**: Automatically cleans up connection records
+- **Error Resilient**: Handles edge cases like already-revoked tokens gracefully
+
+---
+
 ## v2.1.3 - Service Architecture Refactoring (November 23, 2025)
 
 ### 🔄 What's Changed
@@ -183,8 +280,7 @@ Instead of manually defining relationships and methods in each model, you can no
 use Illuminate\Database\Eloquent\Model;
 use Mantix\LaravelSocialMediaPublisher\Facades\SocialMedia;
 
-class User extends Model
-{
+class User extends Model {
     use HasSocialMediaConnections;
     
     // That's it! All methods are now available
@@ -257,8 +353,7 @@ If you want to use the trait in your existing models:
    ```php
    use Mantix\LaravelSocialMediaPublisher\Traits\HasSocialMediaConnections;
    
-   class User extends Model
-   {
+   class User extends Model {
        use HasSocialMediaConnections;
    }
    ```

@@ -5,6 +5,29 @@ All notable changes to the **Laravel Social Media Publisher** package will be do
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.4] - 2025-11-23
+
+### 🚀 Added
+- **Disconnect Functionality**: Added comprehensive disconnect/revoke functionality across all platforms.
+  - Added `disconnect()` static method to all platform services (Facebook, X, LinkedIn, Instagram, TikTok, YouTube, Pinterest, Telegram).
+  - Added `disconnect()` instance method to `SocialMediaConnection` model for easy disconnection.
+  - Platform-specific token revocation implemented using each platform's OAuth revocation endpoints.
+  - Graceful error handling for already-revoked or invalid tokens.
+  - Updated all facade classes to expose `disconnect()` method.
+
+### 📝 Usage
+- **Via Connection Model**: `$connection->disconnect()` - Revokes token and deletes connection record.
+- **Via Service/Facade**: `LinkedIn::disconnect($accessToken)` - Revokes token on platform only.
+
+### 🔧 Technical Details
+- **Facebook/Instagram**: Uses Graph API DELETE endpoint to revoke permissions.
+- **LinkedIn**: Uses OAuth v2 revocation endpoint with client credentials.
+- **X (Twitter)**: Uses OAuth 2.0 revocation endpoint.
+- **YouTube**: Uses Google OAuth revocation endpoint.
+- **TikTok**: Uses TikTok API v2 revocation endpoint.
+- **Pinterest**: Uses Pinterest API v5 DELETE endpoint.
+- **Telegram**: No token revocation (Bot API), returns true for consistency.
+
 ## [2.1.3] - 2025-11-23
 
 ### 🔄 Changed

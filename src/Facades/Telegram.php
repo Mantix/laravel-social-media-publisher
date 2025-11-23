@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Facade;
  *
  * @method static mixed verifyBotToken(string $token)
  * @method static mixed getUpdates(string $token)
+ * @method static bool disconnect(string $accessToken)
  * @method static \Mantix\LaravelSocialMediaPublisher\Services\TelegramService forConnection(\Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection)
  *
  * @see \Mantix\LaravelSocialMediaPublisher\Services\TelegramService

@@ -73,7 +73,9 @@ class FacebookService extends SocialMediaService implements ShareInterface, Shar
         // If it's a Page connection, we expect the platform_user_id to be the Page ID
         $pageId = ($connection->connection_type === 'page') ? $connection->platform_user_id : null;
 
-        return new self($token, $pageId);
+        $service = new self();
+        $service->setCredentials($token, $pageId);
+        return $service;
     }
 
     /* --------------------------------------------------------------------------
@@ -169,6 +171,46 @@ class FacebookService extends SocialMediaService implements ShareInterface, Shar
             'token_type' => 'bearer',
             'profile' => $profileResponse->json()
         ];
+    }
+
+    /**
+     * Revoke an access token and disconnect from Facebook.
+     *
+     * @param string $accessToken
+     * @return bool
+     * @throws SocialMediaException
+     */
+    public static function disconnect(string $accessToken): bool {
+        // Facebook token revocation: DELETE /{user-id}/permissions
+        // We need to get the user ID first, or use DELETE /me/permissions
+        try {
+            // First, get the user ID
+            $response = Http::get(self::GRAPH_URL . '/' . self::API_VERSION . '/me', [
+                'access_token' => $accessToken,
+                'fields' => 'id',
+            ]);
+
+            if (!$response->successful()) {
+                // Token might already be invalid, consider it revoked
+                return true;
+            }
+
+            $userId = $response->json()['id'] ?? null;
+
+            if ($userId) {
+                // Revoke permissions
+                $revokeResponse = Http::delete(self::GRAPH_URL . '/' . self::API_VERSION . '/' . $userId . '/permissions', [
+                    'access_token' => $accessToken,
+                ]);
+
+                return $revokeResponse->successful() || $revokeResponse->status() === 400;
+            }
+        } catch (\Exception $e) {
+            // If token is already invalid, consider it successfully revoked
+            return true;
+        }
+
+        return true;
     }
 
     /**

@@ -6,15 +6,13 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 
-trait HasSocialMediaConnections
-{
+trait HasSocialMediaConnections {
     /**
      * Get all social media connections for this model.
      *
      * @return MorphMany
      */
-    public function social_media_connections(): MorphMany
-    {
+    public function social_media_connections(): MorphMany {
         return $this->morphMany(SocialMediaConnection::class, 'owner');
     }
 
@@ -23,8 +21,7 @@ trait HasSocialMediaConnections
      *
      * @return HasOne
      */
-    public function social_connection_linkedin(): HasOne
-    {
+    public function social_connection_linkedin(): HasOne {
         return $this->hasOne(SocialMediaConnection::class, 'owner_id')
             ->where('owner_type', self::class)
             ->where('platform', 'linkedin')
@@ -36,8 +33,7 @@ trait HasSocialMediaConnections
      *
      * @return HasOne
      */
-    public function social_connection_instagram(): HasOne
-    {
+    public function social_connection_instagram(): HasOne {
         return $this->hasOne(SocialMediaConnection::class, 'owner_id')
             ->where('owner_type', self::class)
             ->where('platform', 'instagram')
@@ -49,8 +45,7 @@ trait HasSocialMediaConnections
      *
      * @return HasOne
      */
-    public function social_connection_facebook(): HasOne
-    {
+    public function social_connection_facebook(): HasOne {
         return $this->hasOne(SocialMediaConnection::class, 'owner_id')
             ->where('owner_type', self::class)
             ->where('platform', 'facebook')
@@ -62,8 +57,7 @@ trait HasSocialMediaConnections
      *
      * @return HasOne
      */
-    public function social_connection_x(): HasOne
-    {
+    public function social_connection_x(): HasOne {
         return $this->hasOne(SocialMediaConnection::class, 'owner_id')
             ->where('owner_type', self::class)
             ->where('platform', 'x')
@@ -76,8 +70,7 @@ trait HasSocialMediaConnections
      * @param string $platform
      * @return SocialMediaConnection|null
      */
-    public function getSocialConnection(string $platform): ?SocialMediaConnection
-    {
+    public function getSocialConnection(string $platform): ?SocialMediaConnection {
         return $this->social_media_connections()
             ->forPlatform($platform)
             ->active()
@@ -90,8 +83,7 @@ trait HasSocialMediaConnections
      * @param string $platform
      * @return bool
      */
-    public function hasSocialConnection(string $platform): bool
-    {
+    public function hasSocialConnection(string $platform): bool {
         return $this->getSocialConnection($platform) !== null;
     }
 }

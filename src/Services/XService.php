@@ -63,7 +63,9 @@ class XService extends SocialMediaService implements ShareInterface, ShareImageP
             throw new SocialMediaException('X connection is missing the Access Token.');
         }
 
-        return new self($token);
+        $service = new self();
+        $service->setCredentials($token);
+        return $service;
     }
 
     /* --------------------------------------------------------------------------
@@ -163,6 +165,31 @@ class XService extends SocialMediaService implements ShareInterface, ShareImageP
         }
 
         return $response->json();
+    }
+
+    /**
+     * Revoke an access token and disconnect from X (Twitter).
+     *
+     * @param string $accessToken
+     * @return bool
+     * @throws SocialMediaException
+     */
+    public static function disconnect(string $accessToken): bool {
+        $clientId = config('social_media_publisher.x_client_id');
+        $clientSecret = config('social_media_publisher.x_client_secret');
+
+        if (!$clientId || !$clientSecret) {
+            throw new SocialMediaException('X Client ID and Secret are required for token revocation.');
+        }
+
+        $response = Http::asForm()->withBasicAuth($clientId, $clientSecret)
+            ->post('https://api.twitter.com/2/oauth2/revoke', [
+                'token' => $accessToken,
+                'token_type_hint' => 'access_token',
+            ]);
+
+        // X returns 200 on success, or 400 if token is already invalid
+        return $response->status() === 200 || $response->status() === 400;
     }
 
     /* --------------------------------------------------------------------------

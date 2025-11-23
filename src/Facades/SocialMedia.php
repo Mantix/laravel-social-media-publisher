@@ -26,10 +26,8 @@ use Mantix\LaravelSocialMediaPublisher\Services\SocialMediaManager;
  *
  * @see \mantix\LaravelSocialMediaPublisher\Services\SocialMediaManager
  */
-class SocialMedia extends Facade
-{
-    protected static function getFacadeAccessor()
-    {
+class SocialMedia extends Facade {
+    protected static function getFacadeAccessor() {
         return SocialMediaManager::class;
     }
 }

@@ -59,7 +59,9 @@ class TikTokService extends SocialMediaService implements ShareInterface, ShareV
             throw new SocialMediaException('TikTok connection is missing required credentials.');
         }
 
-        return new self($accessToken);
+        $service = new self();
+        $service->setCredentials($accessToken);
+        return $service;
     }
 
     /* --------------------------------------------------------------------------
@@ -151,6 +153,31 @@ class TikTokService extends SocialMediaService implements ShareInterface, ShareV
         }
 
         return $response->json();
+    }
+
+    /**
+     * Revoke an access token and disconnect from TikTok.
+     *
+     * @param string $accessToken
+     * @return bool
+     * @throws SocialMediaException
+     */
+    public static function disconnect(string $accessToken): bool {
+        $clientKey = config('social_media_publisher.tiktok_client_id');
+        $clientSecret = config('social_media_publisher.tiktok_client_secret');
+
+        if (!$clientKey || !$clientSecret) {
+            throw new SocialMediaException('TikTok Client ID and Secret are required for token revocation.');
+        }
+
+        $response = Http::asForm()->post(self::API_BASE_URL . '/oauth/revoke/', [
+            'client_key' => $clientKey,
+            'client_secret' => $clientSecret,
+            'token' => $accessToken,
+        ]);
+
+        // TikTok returns 200 on success
+        return $response->successful();
     }
 
     /* --------------------------------------------------------------------------

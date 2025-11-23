@@ -269,8 +269,7 @@ Add the `HasSocialMediaConnections` trait to your User or Company models to easi
 ```php
 use Mantix\LaravelSocialMediaPublisher\Traits\HasSocialMediaConnections;
 
-class User extends Authenticatable
-{
+class User extends Authenticatable {
     use HasSocialMediaConnections;
 }
 
@@ -310,6 +309,35 @@ $linkedin->shareText('Hello LinkedIn!');
 ```
 
 **Note:** The recommended approach is to use `forConnection()` or `SocialMedia::platform()`, which handle credential setting automatically.
+
+### Disconnecting Social Media Accounts
+
+You can disconnect social media accounts by revoking tokens and deleting connection records:
+
+```php
+use Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
+
+// Get a connection
+$connection = SocialMediaConnection::where('platform', 'linkedin')
+    ->where('owner_id', $user->id)
+    ->first();
+
+// Disconnect (revokes token on platform and deletes connection)
+$connection->disconnect();
+
+// Or disconnect without revoking token (just delete local record)
+$connection->disconnect(revokeToken: false);
+
+// Or use the service directly to revoke a token
+use Mantix\LaravelSocialMediaPublisher\Facades\LinkedIn;
+
+LinkedIn::disconnect($accessToken);
+```
+
+**Note:** The `disconnect()` method on `SocialMediaConnection` automatically:
+1. Revokes the access token on the platform (if supported)
+2. Deletes the connection record from your database
+3. Handles errors gracefully (e.g., if token is already invalid)
 
 -----
 

@@ -7,10 +7,8 @@ use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class FacebookOAuthTest extends TestCase
-{
-    public function testGetAuthorizationUrl()
-    {
+class FacebookOAuthTest extends TestCase {
+    public function testGetAuthorizationUrl() {
         config(['social_media_publisher.enable_logging' => false]);
         
         $redirectUri = 'https://example.com/callback';
@@ -22,8 +20,7 @@ class FacebookOAuthTest extends TestCase
         $this->assertStringContainsString('scope=', $url);
     }
 
-    public function testGetAuthorizationUrlWithCustomScopes()
-    {
+    public function testGetAuthorizationUrlWithCustomScopes() {
         config(['social_media_publisher.enable_logging' => false]);
         
         $redirectUri = 'https://example.com/callback';
@@ -33,8 +30,7 @@ class FacebookOAuthTest extends TestCase
         $this->assertStringContainsString('scope=' . urlencode(implode(',', $scopes)), $url);
     }
 
-    public function testGetAuthorizationUrlWithState()
-    {
+    public function testGetAuthorizationUrlWithState() {
         config(['social_media_publisher.enable_logging' => false]);
         
         $redirectUri = 'https://example.com/callback';
@@ -44,8 +40,7 @@ class FacebookOAuthTest extends TestCase
         $this->assertStringContainsString('state=' . $state, $url);
     }
 
-    public function testGetAuthorizationUrlThrowsExceptionWhenClientIdMissing()
-    {
+    public function testGetAuthorizationUrlThrowsExceptionWhenClientIdMissing() {
         config(['social_media_publisher.facebook_client_id' => null]);
         
         $this->expectException(SocialMediaException::class);
@@ -54,8 +49,7 @@ class FacebookOAuthTest extends TestCase
         FacebookService::getAuthorizationUrl('https://example.com/callback');
     }
 
-    public function testHandleCallback()
-    {
+    public function testHandleCallback() {
         config(['social_media_publisher.enable_logging' => false]);
         
         Http::fake([
@@ -87,8 +81,7 @@ class FacebookOAuthTest extends TestCase
         $this->assertEquals('test_page_id', $result['pages'][0]['id']);
     }
 
-    public function testHandleCallbackThrowsExceptionWhenCodeMissing()
-    {
+    public function testHandleCallbackThrowsExceptionWhenCodeMissing() {
         config(['social_media_publisher.enable_logging' => false]);
         
         Http::fake([
@@ -102,8 +95,7 @@ class FacebookOAuthTest extends TestCase
         FacebookService::handleCallback('invalid_code', 'https://example.com/callback');
     }
 
-    public function testDisconnect()
-    {
+    public function testDisconnect() {
         config(['social_media_publisher.enable_logging' => false]);
         
         Http::fake([
@@ -115,8 +107,7 @@ class FacebookOAuthTest extends TestCase
         $this->assertTrue($result);
     }
 
-    public function testDisconnectReturnsFalseOnFailure()
-    {
+    public function testDisconnectReturnsFalseOnFailure() {
         config(['social_media_publisher.enable_logging' => false]);
         
         Http::fake([

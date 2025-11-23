@@ -8,10 +8,8 @@ use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 use Mantix\LaravelSocialMediaPublisher\Services\XService;
 use Mantix\LaravelSocialMediaPublisher\Tests\Unit\TestCase;
 
-class XServiceTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class XServiceTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
         
         config([
@@ -23,16 +21,14 @@ class XServiceTest extends TestCase
         ]);
     }
 
-    public function testXServiceSingleton()
-    {
+    public function testXServiceSingleton() {
         $service1 = XService::getInstance();
         $service2 = XService::getInstance();
         
         $this->assertSame($service1, $service2);
     }
 
-    public function testXServiceWithMissingCredentials()
-    {
+    public function testXServiceWithMissingCredentials() {
         config(['social_media_publisher.x_bearer_token' => null]);
         
         $this->expectException(SocialMediaException::class);
@@ -41,8 +37,7 @@ class XServiceTest extends TestCase
         XService::getInstance();
     }
 
-    public function testShareSuccess()
-    {
+    public function testShareSuccess() {
         Http::fake([
             'https://api.twitter.com/2/tweets' => Http::response(['data' => ['id' => '123']], 200),
         ]);
@@ -54,8 +49,7 @@ class XServiceTest extends TestCase
         $this->assertEquals('123', $result['data']['id']);
     }
 
-    public function testShareImageSuccess()
-    {
+    public function testShareImageSuccess() {
         Http::fake([
             'https://upload.twitter.com/1.1/media/upload.json' => Http::response(['media_id_string' => 'media123'], 200),
             'https://api.twitter.com/2/tweets' => Http::response(['data' => ['id' => '456']], 200),
@@ -68,8 +62,7 @@ class XServiceTest extends TestCase
         $this->assertEquals('456', $result['data']['id']);
     }
 
-    public function testShareVideoSuccess()
-    {
+    public function testShareVideoSuccess() {
         Http::fake([
             'https://upload.twitter.com/1.1/media/upload.json' => Http::response(['media_id_string' => 'media123'], 200),
             'https://api.twitter.com/2/tweets' => Http::response(['data' => ['id' => '789']], 200),
@@ -82,8 +75,7 @@ class XServiceTest extends TestCase
         $this->assertEquals('789', $result['data']['id']);
     }
 
-    public function testGetTimelineSuccess()
-    {
+    public function testGetTimelineSuccess() {
         Http::fake([
             'https://api.twitter.com/2/users/me/tweets' => Http::response([
                 'data' => [
@@ -100,8 +92,7 @@ class XServiceTest extends TestCase
         $this->assertCount(2, $result['data']);
     }
 
-    public function testGetUserInfoSuccess()
-    {
+    public function testGetUserInfoSuccess() {
         Http::fake([
             'https://api.twitter.com/2/users/me' => Http::response([
                 'data' => [
@@ -119,8 +110,7 @@ class XServiceTest extends TestCase
         $this->assertEquals('testuser', $result['data']['username']);
     }
 
-    public function testShareWithEmptyCaption()
-    {
+    public function testShareWithEmptyCaption() {
         $service = XService::getInstance();
         
         $this->expectException(SocialMediaException::class);
@@ -129,8 +119,7 @@ class XServiceTest extends TestCase
         $service->share('', 'https://example.com');
     }
 
-    public function testShareWithCaptionTooLong()
-    {
+    public function testShareWithCaptionTooLong() {
         $service = XService::getInstance();
         $longCaption = str_repeat('a', 281); // Over 280 character limit
         
@@ -140,8 +129,7 @@ class XServiceTest extends TestCase
         $service->share($longCaption, 'https://example.com');
     }
 
-    public function testShareWithInvalidUrl()
-    {
+    public function testShareWithInvalidUrl() {
         $service = XService::getInstance();
         
         $this->expectException(SocialMediaException::class);
@@ -150,8 +138,7 @@ class XServiceTest extends TestCase
         $service->share('Test tweet', 'invalid-url');
     }
 
-    public function testShareWithApiError()
-    {
+    public function testShareWithApiError() {
         Http::fake([
             'https://api.twitter.com/2/tweets' => Http::response([
                 'errors' => [['message' => 'Invalid access token']]
@@ -166,8 +153,7 @@ class XServiceTest extends TestCase
         $service->share('Test tweet', 'https://example.com');
     }
 
-    public function testShareImageWithApiError()
-    {
+    public function testShareImageWithApiError() {
         Http::fake([
             'https://upload.twitter.com/1.1/media/upload.json' => Http::response([
                 'errors' => [['message' => 'Invalid image']]
@@ -182,8 +168,7 @@ class XServiceTest extends TestCase
         $service->shareImage('Test image tweet', 'https://example.com/image.jpg');
     }
 
-    public function testShareVideoWithApiError()
-    {
+    public function testShareVideoWithApiError() {
         Http::fake([
             'https://upload.twitter.com/1.1/media/upload.json' => Http::response([
                 'errors' => [['message' => 'Invalid video']]
@@ -198,8 +183,7 @@ class XServiceTest extends TestCase
         $service->shareVideo('Test video tweet', 'https://example.com/video.mp4');
     }
 
-    public function testGetTimelineWithApiError()
-    {
+    public function testGetTimelineWithApiError() {
         Http::fake([
             'https://api.twitter.com/2/users/me/tweets' => Http::response([
                 'errors' => [['message' => 'Invalid request']]
@@ -214,8 +198,7 @@ class XServiceTest extends TestCase
         $service->getTimeline(5);
     }
 
-    public function testGetUserInfoWithApiError()
-    {
+    public function testGetUserInfoWithApiError() {
         Http::fake([
             'https://api.twitter.com/2/users/me' => Http::response([
                 'errors' => [['message' => 'Invalid user']]
@@ -230,8 +213,7 @@ class XServiceTest extends TestCase
         $service->getUserInfo();
     }
 
-    public function testLoggingOnSuccess()
-    {
+    public function testLoggingOnSuccess() {
         Log::shouldReceive('info')
             ->once()
             ->with('X (Twitter) post shared successfully', \Mockery::type('array'));
@@ -244,8 +226,7 @@ class XServiceTest extends TestCase
         $service->share('Test tweet', 'https://example.com');
     }
 
-    public function testLoggingOnError()
-    {
+    public function testLoggingOnError() {
         Log::shouldReceive('error')
             ->once()
             ->with('Failed to share to X (Twitter)', \Mockery::type('array'));
@@ -262,8 +243,7 @@ class XServiceTest extends TestCase
         $service->share('Test tweet', 'https://example.com');
     }
 
-    public function testRetryLogic()
-    {
+    public function testRetryLogic() {
         Http::fake([
             'https://api.twitter.com/2/tweets' => Http::sequence()
                 ->push(['errors' => [['message' => 'Rate limited']]], 429)
@@ -278,8 +258,7 @@ class XServiceTest extends TestCase
         $this->assertEquals('123', $result['data']['id']);
     }
 
-    public function testMediaUploadWithChunkedVideo()
-    {
+    public function testMediaUploadWithChunkedVideo() {
         Http::fake([
             'https://upload.twitter.com/1.1/media/upload.json' => Http::response(['media_id_string' => 'media123'], 200),
             'https://api.twitter.com/2/tweets' => Http::response(['data' => ['id' => '456']], 200),
@@ -292,8 +271,7 @@ class XServiceTest extends TestCase
         $this->assertEquals('456', $result['data']['id']);
     }
 
-    public function testTimeoutConfiguration()
-    {
+    public function testTimeoutConfiguration() {
         config(['social_media_publisher.timeout' => 60]);
 
         Http::fake([

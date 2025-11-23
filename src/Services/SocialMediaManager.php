@@ -12,8 +12,7 @@ use Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
  * Manager service for handling multiple social media platforms.
  * Provides unified interface for publishing to multiple platforms simultaneously.
  */
-class SocialMediaManager
-{
+class SocialMediaManager {
     /**
      * Available platforms mapping.
      */
@@ -39,8 +38,7 @@ class SocialMediaManager
      * @return mixed The platform service instance.
      * @throws SocialMediaException
      */
-    public function platform(string $platform, $owner = null, ?int $ownerId = null, ?string $connectionType = 'profile')
-    {
+    public function platform(string $platform, $owner = null, ?int $ownerId = null, ?string $connectionType = 'profile') {
         if (!isset(self::PLATFORMS[$platform])) {
             throw new SocialMediaException("Platform '{$platform}' is not supported.");
         }
@@ -73,64 +71,56 @@ class SocialMediaManager
     /**
      * Get Facebook service.
      */
-    public function facebook()
-    {
+    public function facebook() {
         return $this->platform('facebook');
     }
 
     /**
      * Get X service.
      */
-    public function x()
-    {
+    public function x() {
         return $this->platform('x');
     }
 
     /**
      * Get LinkedIn service.
      */
-    public function linkedin()
-    {
+    public function linkedin() {
         return $this->platform('linkedin');
     }
 
     /**
      * Get Instagram service.
      */
-    public function instagram()
-    {
+    public function instagram() {
         return $this->platform('instagram');
     }
 
     /**
      * Get TikTok service.
      */
-    public function tiktok()
-    {
+    public function tiktok() {
         return $this->platform('tiktok');
     }
 
     /**
      * Get YouTube service.
      */
-    public function youtube()
-    {
+    public function youtube() {
         return $this->platform('youtube');
     }
 
     /**
      * Get Pinterest service.
      */
-    public function pinterest()
-    {
+    public function pinterest() {
         return $this->platform('pinterest');
     }
 
     /**
      * Get Telegram service.
      */
-    public function telegram()
-    {
+    public function telegram() {
         return $this->platform('telegram');
     }
 
@@ -144,8 +134,7 @@ class SocialMediaManager
      * @param int|null $ownerId Optional owner ID if passing class name.
      * @return array Results from all platforms.
      */
-    private function executeOnPlatforms(array $platforms, string $method, array $parameters, $owner = null, ?int $ownerId = null): array
-    {
+    private function executeOnPlatforms(array $platforms, string $method, array $parameters, $owner = null, ?int $ownerId = null): array {
         $results = [];
         $errors = [];
 
@@ -227,8 +216,7 @@ class SocialMediaManager
      * @param int|null $ownerId Optional owner ID if passing class name.
      * @return array Results from all platforms.
      */
-    public function shareText($owner, array $platforms, string $caption, ?int $ownerId = null): array
-    {
+    public function shareText($owner, array $platforms, string $caption, ?int $ownerId = null): array {
         return $this->executeOnPlatforms($platforms, 'shareText', [$caption], $owner, $ownerId);
     }
 
@@ -242,8 +230,7 @@ class SocialMediaManager
      * @param int|null $ownerId Optional owner ID if passing class name.
      * @return array Results from all platforms.
      */
-    public function shareUrl($owner, array $platforms, string $caption, string $url, ?int $ownerId = null): array
-    {
+    public function shareUrl($owner, array $platforms, string $caption, string $url, ?int $ownerId = null): array {
         return $this->executeOnPlatforms($platforms, 'shareUrl', [$caption, $url], $owner, $ownerId);
     }
 
@@ -257,8 +244,7 @@ class SocialMediaManager
      * @param int|null $ownerId Optional owner ID if passing class name.
      * @return array Results from all platforms.
      */
-    public function shareImage($owner, array $platforms, string $caption, string $image_url, ?int $ownerId = null): array
-    {
+    public function shareImage($owner, array $platforms, string $caption, string $image_url, ?int $ownerId = null): array {
         return $this->executeOnPlatforms($platforms, 'shareImage', [$caption, $image_url], $owner, $ownerId);
     }
 
@@ -272,8 +258,7 @@ class SocialMediaManager
      * @param int|null $ownerId Optional owner ID if passing class name.
      * @return array Results from all platforms.
      */
-    public function shareVideo($owner, array $platforms, string $caption, string $video_url, ?int $ownerId = null): array
-    {
+    public function shareVideo($owner, array $platforms, string $caption, string $video_url, ?int $ownerId = null): array {
         return $this->executeOnPlatforms($platforms, 'shareVideo', [$caption, $video_url], $owner, $ownerId);
     }
 
@@ -282,8 +267,7 @@ class SocialMediaManager
      *
      * @return array Array of available platform names.
      */
-    public function getAvailablePlatforms(): array
-    {
+    public function getAvailablePlatforms(): array {
         return array_keys(self::PLATFORMS);
     }
 
@@ -293,8 +277,7 @@ class SocialMediaManager
      * @param string $platform The platform name.
      * @return bool True if platform is available.
      */
-    public function isPlatformAvailable(string $platform): bool
-    {
+    public function isPlatformAvailable(string $platform): bool {
         return isset(self::PLATFORMS[$platform]);
     }
 
@@ -304,8 +287,7 @@ class SocialMediaManager
      * @param string $platform The platform name.
      * @return string|null The service class name or null if not found.
      */
-    public function getPlatformService(string $platform): ?string
-    {
+    public function getPlatformService(string $platform): ?string {
         return self::PLATFORMS[$platform] ?? null;
     }
 }

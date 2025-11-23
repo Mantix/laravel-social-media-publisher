@@ -8,10 +8,8 @@ use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class FacebookServiceTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class FacebookServiceTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
         
         config([
@@ -21,16 +19,14 @@ class FacebookServiceTest extends TestCase
         ]);
     }
 
-    public function testGetInstanceThrowsException()
-    {
+    public function testGetInstanceThrowsException() {
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('OAuth connection required');
         
         FacebookService::getInstance();
     }
 
-    public function testForConnection()
-    {
+    public function testForConnection() {
         $connection = $this->createFacebookConnection();
         
         $service = FacebookService::forConnection($connection);
@@ -38,8 +34,7 @@ class FacebookServiceTest extends TestCase
         $this->assertInstanceOf(FacebookService::class, $service);
     }
 
-    public function testForConnectionWithWrongPlatform()
-    {
+    public function testForConnectionWithWrongPlatform() {
         $connection = $this->createLinkedInConnection();
         
         $this->expectException(SocialMediaException::class);
@@ -48,8 +43,7 @@ class FacebookServiceTest extends TestCase
         FacebookService::forConnection($connection);
     }
 
-    public function testForConnectionWithMissingCredentials()
-    {
+    public function testForConnectionWithMissingCredentials() {
         $connection = $this->createConnection([
             'platform' => 'facebook',
             'access_token' => null,
@@ -62,8 +56,7 @@ class FacebookServiceTest extends TestCase
         FacebookService::forConnection($connection);
     }
 
-    public function testShareSuccess()
-    {
+    public function testShareSuccess() {
         Http::fake([
             'https://graph.facebook.com/v20.0/test_page_id/feed' => Http::response(['id' => '123'], 200),
         ]);
@@ -76,8 +69,7 @@ class FacebookServiceTest extends TestCase
         $this->assertEquals('123', $result['id']);
     }
 
-    public function testShareImageSuccess()
-    {
+    public function testShareImageSuccess() {
         Http::fake([
             'https://graph.facebook.com/v20.0/test_page_id/photos' => Http::response(['id' => '456'], 200),
         ]);
@@ -90,8 +82,7 @@ class FacebookServiceTest extends TestCase
         $this->assertEquals('456', $result['id']);
     }
 
-    public function testShareVideoSuccess()
-    {
+    public function testShareVideoSuccess() {
         Http::fake([
             'https://graph.facebook.com/v20.0/test_page_id/videos' => Http::response(['id' => '789'], 200),
         ]);
@@ -104,8 +95,7 @@ class FacebookServiceTest extends TestCase
         $this->assertEquals('789', $result['id']);
     }
 
-    public function testGetPageInfoSuccess()
-    {
+    public function testGetPageInfoSuccess() {
         Http::fake([
             'https://graph.facebook.com/v20.0/test_page_id' => Http::response([
                 'id' => 'test_page_id',
@@ -124,8 +114,7 @@ class FacebookServiceTest extends TestCase
         $this->assertEquals('Test Page', $result['name']);
     }
 
-    public function testGetPageInsightsSuccess()
-    {
+    public function testGetPageInsightsSuccess() {
         Http::fake([
             'https://graph.facebook.com/v20.0/test_page_id/insights' => Http::response([
                 'data' => [
@@ -146,8 +135,7 @@ class FacebookServiceTest extends TestCase
         $this->assertEquals('page_impressions', $result['data'][0]['name']);
     }
 
-    public function testGetPageInsightsWithDateRange()
-    {
+    public function testGetPageInsightsWithDateRange() {
         Http::fake([
             'https://graph.facebook.com/v20.0/test_page_id/insights' => Http::response([
                 'data' => [
@@ -169,8 +157,7 @@ class FacebookServiceTest extends TestCase
         $this->assertArrayHasKey('data', $result);
     }
 
-    public function testShareWithEmptyCaption()
-    {
+    public function testShareWithEmptyCaption() {
         $connection = $this->createFacebookConnection();
         $service = FacebookService::forConnection($connection);
         
@@ -180,8 +167,7 @@ class FacebookServiceTest extends TestCase
         $service->share('', 'https://example.com');
     }
 
-    public function testShareWithInvalidUrl()
-    {
+    public function testShareWithInvalidUrl() {
         $connection = $this->createFacebookConnection();
         $service = FacebookService::forConnection($connection);
         
@@ -191,8 +177,7 @@ class FacebookServiceTest extends TestCase
         $service->share('Test post', 'invalid-url');
     }
 
-    public function testShareWithApiError()
-    {
+    public function testShareWithApiError() {
         Http::fake([
             'https://graph.facebook.com/v20.0/test_page_id/feed' => Http::response([
                 'error' => ['message' => 'Invalid access token']
@@ -208,8 +193,7 @@ class FacebookServiceTest extends TestCase
         $service->share('Test post', 'https://example.com');
     }
 
-    public function testShareImageWithApiError()
-    {
+    public function testShareImageWithApiError() {
         Http::fake([
             'https://graph.facebook.com/v20.0/test_page_id/photos' => Http::response([
                 'error' => ['message' => 'Invalid image URL']
@@ -225,8 +209,7 @@ class FacebookServiceTest extends TestCase
         $service->shareImage('Test image', 'https://example.com/image.jpg');
     }
 
-    public function testShareVideoWithApiError()
-    {
+    public function testShareVideoWithApiError() {
         Http::fake([
             'https://graph.facebook.com/v20.0/test_page_id/videos' => Http::response([
                 'error' => ['message' => 'Invalid video URL']
@@ -242,8 +225,7 @@ class FacebookServiceTest extends TestCase
         $service->shareVideo('Test video', 'https://example.com/video.mp4');
     }
 
-    public function testGetPageInfoWithApiError()
-    {
+    public function testGetPageInfoWithApiError() {
         Http::fake([
             'https://graph.facebook.com/v20.0/test_page_id' => Http::response([
                 'error' => ['message' => 'Invalid page ID']
@@ -259,8 +241,7 @@ class FacebookServiceTest extends TestCase
         $service->getPageInfo();
     }
 
-    public function testGetPageInsightsWithApiError()
-    {
+    public function testGetPageInsightsWithApiError() {
         Http::fake([
             'https://graph.facebook.com/v20.0/test_page_id/insights' => Http::response([
                 'error' => ['message' => 'Invalid insights request']
@@ -276,8 +257,7 @@ class FacebookServiceTest extends TestCase
         $service->getPageInsights(['page_impressions']);
     }
 
-    public function testLoggingOnSuccess()
-    {
+    public function testLoggingOnSuccess() {
         Log::shouldReceive('info')
             ->once()
             ->with('Facebook post shared successfully', \Mockery::type('array'));
@@ -291,8 +271,7 @@ class FacebookServiceTest extends TestCase
         $service->share('Test post', 'https://example.com');
     }
 
-    public function testLoggingOnError()
-    {
+    public function testLoggingOnError() {
         Log::shouldReceive('error')
             ->once()
             ->with('Failed to share to Facebook', \Mockery::type('array'));
@@ -310,8 +289,7 @@ class FacebookServiceTest extends TestCase
         $service->share('Test post', 'https://example.com');
     }
 
-    public function testRetryLogic()
-    {
+    public function testRetryLogic() {
         Http::fake([
             'https://graph.facebook.com/v20.0/test_page_id/feed' => Http::sequence()
                 ->push(['error' => ['message' => 'Rate limited']], 429)
@@ -327,8 +305,7 @@ class FacebookServiceTest extends TestCase
         $this->assertEquals('123', $result['id']);
     }
 
-    public function testTimeoutConfiguration()
-    {
+    public function testTimeoutConfiguration() {
         config(['social_media_publisher.timeout' => 60]);
 
         Http::fake([

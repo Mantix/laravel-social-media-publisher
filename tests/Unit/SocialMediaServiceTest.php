@@ -8,38 +8,31 @@ use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class SocialMediaServiceTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class SocialMediaServiceTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
         
         // Mock the abstract SocialMediaService for testing
         $this->service = new class extends SocialMediaService {
-            public function testSendRequest($url, $method = 'post', $params = [], $headers = [])
-            {
+            public function testSendRequest($url, $method = 'post', $params = [], $headers = []) {
                 return $this->sendRequest($url, $method, $params, $headers);
             }
             
-            public function testValidateUrl($url)
-            {
+            public function testValidateUrl($url) {
                 return $this->validateUrl($url);
             }
             
-            public function testValidateText($text, $maxLength = 1000)
-            {
+            public function testValidateText($text, $maxLength = 1000) {
                 return $this->validateText($text, $maxLength);
             }
             
-            public function testDownloadFile($url)
-            {
+            public function testDownloadFile($url) {
                 return $this->downloadFile($url);
             }
         };
     }
 
-    public function testSendRequestSuccess()
-    {
+    public function testSendRequestSuccess() {
         Http::fake([
             'https://api.example.com/test' => Http::response(['success' => true, 'id' => '123'], 200),
         ]);
@@ -51,8 +44,7 @@ class SocialMediaServiceTest extends TestCase
         $this->assertEquals('123', $result['id']);
     }
 
-    public function testSendRequestWithRetry()
-    {
+    public function testSendRequestWithRetry() {
         Http::fake([
             'https://api.example.com/test' => Http::sequence()
                 ->push(['error' => 'Rate limited'], 429)
@@ -66,8 +58,7 @@ class SocialMediaServiceTest extends TestCase
         $this->assertEquals('123', $result['id']);
     }
 
-    public function testSendRequestMaxRetriesExceeded()
-    {
+    public function testSendRequestMaxRetriesExceeded() {
         Http::fake([
             'https://api.example.com/test' => Http::response(['error' => 'Server error'], 500),
         ]);
@@ -78,8 +69,7 @@ class SocialMediaServiceTest extends TestCase
         $this->service->testSendRequest('https://api.example.com/test', 'post', ['test' => 'data']);
     }
 
-    public function testValidateUrlValid()
-    {
+    public function testValidateUrlValid() {
         $this->expectNotToPerformAssertions();
         
         $this->service->testValidateUrl('https://example.com');
@@ -87,24 +77,21 @@ class SocialMediaServiceTest extends TestCase
         $this->service->testValidateUrl('https://subdomain.example.com/path?query=value');
     }
 
-    public function testValidateUrlInvalid()
-    {
+    public function testValidateUrlInvalid() {
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('Invalid URL provided');
 
         $this->service->testValidateUrl('invalid-url');
     }
 
-    public function testValidateUrlEmpty()
-    {
+    public function testValidateUrlEmpty() {
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('Invalid URL provided');
 
         $this->service->testValidateUrl('');
     }
 
-    public function testValidateTextValid()
-    {
+    public function testValidateTextValid() {
         $this->expectNotToPerformAssertions();
         
         $this->service->testValidateText('Valid text');
@@ -112,32 +99,28 @@ class SocialMediaServiceTest extends TestCase
         $this->service->testValidateText(str_repeat('a', 1000), 1000);
     }
 
-    public function testValidateTextEmpty()
-    {
+    public function testValidateTextEmpty() {
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('Text content cannot be empty');
 
         $this->service->testValidateText('');
     }
 
-    public function testValidateTextWhitespaceOnly()
-    {
+    public function testValidateTextWhitespaceOnly() {
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('Text content cannot be empty');
 
         $this->service->testValidateText('   ');
     }
 
-    public function testValidateTextTooLong()
-    {
+    public function testValidateTextTooLong() {
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('Text content exceeds maximum length of 100 characters');
 
         $this->service->testValidateText(str_repeat('a', 101), 100);
     }
 
-    public function testDownloadFileSuccess()
-    {
+    public function testDownloadFileSuccess() {
         Http::fake([
             'https://example.com/file.txt' => Http::response('File content', 200),
         ]);
@@ -147,16 +130,14 @@ class SocialMediaServiceTest extends TestCase
         $this->assertEquals('File content', $content);
     }
 
-    public function testDownloadFileInvalidUrl()
-    {
+    public function testDownloadFileInvalidUrl() {
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('Invalid URL provided');
 
         $this->service->testDownloadFile('invalid-url');
     }
 
-    public function testDownloadFileNotFound()
-    {
+    public function testDownloadFileNotFound() {
         Http::fake([
             'https://example.com/notfound.txt' => Http::response('Not Found', 404),
         ]);
@@ -167,8 +148,7 @@ class SocialMediaServiceTest extends TestCase
         $this->service->testDownloadFile('https://example.com/notfound.txt');
     }
 
-    public function testLoggingEnabled()
-    {
+    public function testLoggingEnabled() {
         Log::shouldReceive('info')
             ->once()
             ->with('Social media API request successful', \Mockery::type('array'));
@@ -180,8 +160,7 @@ class SocialMediaServiceTest extends TestCase
         $this->service->testSendRequest('https://api.example.com/test', 'post', ['test' => 'data']);
     }
 
-    public function testLoggingOnError()
-    {
+    public function testLoggingOnError() {
         Log::shouldReceive('error')
             ->once()
             ->with('Social media API request failed after all retries', \Mockery::type('array'));
@@ -195,8 +174,7 @@ class SocialMediaServiceTest extends TestCase
         $this->service->testSendRequest('https://api.example.com/test', 'post', ['test' => 'data']);
     }
 
-    public function testTimeoutConfiguration()
-    {
+    public function testTimeoutConfiguration() {
         config(['social_media_publisher.timeout' => 60]);
 
         Http::fake([
@@ -210,8 +188,7 @@ class SocialMediaServiceTest extends TestCase
         });
     }
 
-    public function testRetryAttemptsConfiguration()
-    {
+    public function testRetryAttemptsConfiguration() {
         config(['social_media_publisher.retry_attempts' => 5]);
 
         Http::fake([

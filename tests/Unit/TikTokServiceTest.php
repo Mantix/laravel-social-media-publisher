@@ -8,10 +8,8 @@ use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class TikTokServiceTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class TikTokServiceTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
         
         config([
@@ -21,16 +19,14 @@ class TikTokServiceTest extends TestCase
         ]);
     }
 
-    public function testTikTokServiceSingleton()
-    {
+    public function testTikTokServiceSingleton() {
         $service1 = TikTokService::getInstance();
         $service2 = TikTokService::getInstance();
         
         $this->assertSame($service1, $service2);
     }
 
-    public function testTikTokServiceWithMissingCredentials()
-    {
+    public function testTikTokServiceWithMissingCredentials() {
         config(['social_media_publisher.tiktok_access_token' => null]);
         
         $this->expectException(SocialMediaException::class);
@@ -39,8 +35,7 @@ class TikTokServiceTest extends TestCase
         TikTokService::getInstance();
     }
 
-    public function testShareVideoSuccess()
-    {
+    public function testShareVideoSuccess() {
         Http::fake([
             'https://open-api.tiktok.com/share/video/upload/' => Http::response([
                 'data' => ['video_id' => 'tiktok123']
@@ -54,8 +49,7 @@ class TikTokServiceTest extends TestCase
         $this->assertEquals('tiktok123', $result['data']['video_id']);
     }
 
-    public function testGetUserInfoSuccess()
-    {
+    public function testGetUserInfoSuccess() {
         Http::fake([
             'https://open-api.tiktok.com/user/info/' => Http::response([
                 'data' => [
@@ -73,8 +67,7 @@ class TikTokServiceTest extends TestCase
         $this->assertEquals('Test User', $result['data']['display_name']);
     }
 
-    public function testGetUserVideosSuccess()
-    {
+    public function testGetUserVideosSuccess() {
         Http::fake([
             'https://open-api.tiktok.com/video/list/' => Http::response([
                 'data' => [
@@ -94,8 +87,7 @@ class TikTokServiceTest extends TestCase
         $this->assertCount(2, $result['data']['videos']);
     }
 
-    public function testShareVideoWithEmptyCaption()
-    {
+    public function testShareVideoWithEmptyCaption() {
         $service = TikTokService::getInstance();
         
         $this->expectException(SocialMediaException::class);
@@ -104,8 +96,7 @@ class TikTokServiceTest extends TestCase
         $service->shareVideo('', 'https://example.com/video.mp4');
     }
 
-    public function testShareVideoWithCaptionTooLong()
-    {
+    public function testShareVideoWithCaptionTooLong() {
         $service = TikTokService::getInstance();
         $longCaption = str_repeat('a', 2201); // Over 2200 character limit
         
@@ -115,8 +106,7 @@ class TikTokServiceTest extends TestCase
         $service->shareVideo($longCaption, 'https://example.com/video.mp4');
     }
 
-    public function testShareVideoWithInvalidUrl()
-    {
+    public function testShareVideoWithInvalidUrl() {
         $service = TikTokService::getInstance();
         
         $this->expectException(SocialMediaException::class);
@@ -125,8 +115,7 @@ class TikTokServiceTest extends TestCase
         $service->shareVideo('Test video', 'invalid-url');
     }
 
-    public function testShareVideoWithApiError()
-    {
+    public function testShareVideoWithApiError() {
         Http::fake([
             'https://open-api.tiktok.com/share/video/upload/' => Http::response([
                 'error' => ['message' => 'Invalid access token']
@@ -141,8 +130,7 @@ class TikTokServiceTest extends TestCase
         $service->shareVideo('Test TikTok video', 'https://example.com/video.mp4');
     }
 
-    public function testGetUserInfoWithApiError()
-    {
+    public function testGetUserInfoWithApiError() {
         Http::fake([
             'https://open-api.tiktok.com/user/info/' => Http::response([
                 'error' => ['message' => 'Invalid user request']
@@ -157,8 +145,7 @@ class TikTokServiceTest extends TestCase
         $service->getUserInfo();
     }
 
-    public function testGetUserVideosWithApiError()
-    {
+    public function testGetUserVideosWithApiError() {
         Http::fake([
             'https://open-api.tiktok.com/video/list/' => Http::response([
                 'error' => ['message' => 'Invalid video request']
@@ -173,8 +160,7 @@ class TikTokServiceTest extends TestCase
         $service->getUserVideos(20);
     }
 
-    public function testLoggingOnSuccess()
-    {
+    public function testLoggingOnSuccess() {
         Log::shouldReceive('info')
             ->once()
             ->with('TikTok video post shared successfully', \Mockery::type('array'));
@@ -189,8 +175,7 @@ class TikTokServiceTest extends TestCase
         $service->shareVideo('Test TikTok video', 'https://example.com/video.mp4');
     }
 
-    public function testLoggingOnError()
-    {
+    public function testLoggingOnError() {
         Log::shouldReceive('error')
             ->once()
             ->with('Failed to share video to TikTok', \Mockery::type('array'));
@@ -207,8 +192,7 @@ class TikTokServiceTest extends TestCase
         $service->shareVideo('Test TikTok video', 'https://example.com/video.mp4');
     }
 
-    public function testRetryLogic()
-    {
+    public function testRetryLogic() {
         Http::fake([
             'https://open-api.tiktok.com/share/video/upload/' => Http::sequence()
                 ->push(['error' => ['message' => 'Rate limited']], 429)
@@ -223,8 +207,7 @@ class TikTokServiceTest extends TestCase
         $this->assertEquals('tiktok123', $result['data']['video_id']);
     }
 
-    public function testTimeoutConfiguration()
-    {
+    public function testTimeoutConfiguration() {
         config(['social_media_publisher.timeout' => 60]);
 
         Http::fake([
@@ -241,8 +224,7 @@ class TikTokServiceTest extends TestCase
         });
     }
 
-    public function testVideoUploadWithLargeFile()
-    {
+    public function testVideoUploadWithLargeFile() {
         Http::fake([
             'https://open-api.tiktok.com/share/video/upload/' => Http::response([
                 'data' => ['video_id' => 'tiktok123']
@@ -256,8 +238,7 @@ class TikTokServiceTest extends TestCase
         $this->assertEquals('tiktok123', $result['data']['video_id']);
     }
 
-    public function testGetUserVideosWithPagination()
-    {
+    public function testGetUserVideosWithPagination() {
         Http::fake([
             'https://open-api.tiktok.com/video/list/' => Http::response([
                 'data' => [
@@ -278,8 +259,7 @@ class TikTokServiceTest extends TestCase
         $this->assertArrayHasKey('cursor', $result['data']);
     }
 
-    public function testGetUserVideosWithMaxCount()
-    {
+    public function testGetUserVideosWithMaxCount() {
         Http::fake([
             'https://open-api.tiktok.com/video/list/' => Http::response([
                 'data' => [
@@ -297,8 +277,7 @@ class TikTokServiceTest extends TestCase
         $this->assertCount(1, $result['data']['videos']);
     }
 
-    public function testVideoUploadWithMetadata()
-    {
+    public function testVideoUploadWithMetadata() {
         Http::fake([
             'https://open-api.tiktok.com/share/video/upload/' => Http::response([
                 'data' => ['video_id' => 'tiktok123']

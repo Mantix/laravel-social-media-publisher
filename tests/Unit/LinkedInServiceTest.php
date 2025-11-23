@@ -8,10 +8,8 @@ use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class LinkedInServiceTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class LinkedInServiceTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
         
         config([
@@ -21,16 +19,14 @@ class LinkedInServiceTest extends TestCase
         ]);
     }
 
-    public function testLinkedInServiceSingleton()
-    {
+    public function testLinkedInServiceSingleton() {
         $service1 = LinkedInService::getInstance();
         $service2 = LinkedInService::getInstance();
         
         $this->assertSame($service1, $service2);
     }
 
-    public function testLinkedInServiceWithMissingCredentials()
-    {
+    public function testLinkedInServiceWithMissingCredentials() {
         config(['social_media_publisher.linkedin_access_token' => null]);
         
         $this->expectException(SocialMediaException::class);
@@ -39,8 +35,7 @@ class LinkedInServiceTest extends TestCase
         LinkedInService::getInstance();
     }
 
-    public function testShareSuccess()
-    {
+    public function testShareSuccess() {
         Http::fake([
             'https://api.linkedin.com/v2/ugcPosts' => Http::response(['id' => '123'], 200),
         ]);
@@ -52,8 +47,7 @@ class LinkedInServiceTest extends TestCase
         $this->assertEquals('123', $result['id']);
     }
 
-    public function testShareImageSuccess()
-    {
+    public function testShareImageSuccess() {
         Http::fake([
             'https://api.linkedin.com/v2/assets' => Http::response(['value' => ['asset' => 'urn:li:digitalmediaAsset:123']], 200),
             'https://api.linkedin.com/v2/ugcPosts' => Http::response(['id' => '456'], 200),
@@ -66,8 +60,7 @@ class LinkedInServiceTest extends TestCase
         $this->assertEquals('456', $result['id']);
     }
 
-    public function testShareVideoSuccess()
-    {
+    public function testShareVideoSuccess() {
         Http::fake([
             'https://api.linkedin.com/v2/assets' => Http::response(['value' => ['asset' => 'urn:li:digitalmediaAsset:123']], 200),
             'https://api.linkedin.com/v2/ugcPosts' => Http::response(['id' => '789'], 200),
@@ -80,8 +73,7 @@ class LinkedInServiceTest extends TestCase
         $this->assertEquals('789', $result['id']);
     }
 
-    public function testShareToCompanyPageSuccess()
-    {
+    public function testShareToCompanyPageSuccess() {
         Http::fake([
             'https://api.linkedin.com/v2/ugcPosts' => Http::response(['id' => 'company123'], 200),
         ]);
@@ -93,8 +85,7 @@ class LinkedInServiceTest extends TestCase
         $this->assertEquals('company123', $result['id']);
     }
 
-    public function testGetUserInfoSuccess()
-    {
+    public function testGetUserInfoSuccess() {
         Http::fake([
             'https://api.linkedin.com/v2/people/~' => Http::response([
                 'id' => 'user123',
@@ -110,8 +101,7 @@ class LinkedInServiceTest extends TestCase
         $this->assertEquals('Test', $result['firstName']);
     }
 
-    public function testShareWithEmptyCaption()
-    {
+    public function testShareWithEmptyCaption() {
         $service = LinkedInService::getInstance();
         
         $this->expectException(SocialMediaException::class);
@@ -120,8 +110,7 @@ class LinkedInServiceTest extends TestCase
         $service->share('', 'https://example.com');
     }
 
-    public function testShareWithCaptionTooLong()
-    {
+    public function testShareWithCaptionTooLong() {
         $service = LinkedInService::getInstance();
         $longCaption = str_repeat('a', 3001); // Over 3000 character limit
         
@@ -131,8 +120,7 @@ class LinkedInServiceTest extends TestCase
         $service->share($longCaption, 'https://example.com');
     }
 
-    public function testShareWithInvalidUrl()
-    {
+    public function testShareWithInvalidUrl() {
         $service = LinkedInService::getInstance();
         
         $this->expectException(SocialMediaException::class);
@@ -141,8 +129,7 @@ class LinkedInServiceTest extends TestCase
         $service->share('Test post', 'invalid-url');
     }
 
-    public function testShareWithApiError()
-    {
+    public function testShareWithApiError() {
         Http::fake([
             'https://api.linkedin.com/v2/ugcPosts' => Http::response([
                 'message' => 'Invalid access token'
@@ -157,8 +144,7 @@ class LinkedInServiceTest extends TestCase
         $service->share('Test post', 'https://example.com');
     }
 
-    public function testShareImageWithApiError()
-    {
+    public function testShareImageWithApiError() {
         Http::fake([
             'https://api.linkedin.com/v2/assets' => Http::response([
                 'message' => 'Invalid image URL'
@@ -173,8 +159,7 @@ class LinkedInServiceTest extends TestCase
         $service->shareImage('Test image post', 'https://example.com/image.jpg');
     }
 
-    public function testShareVideoWithApiError()
-    {
+    public function testShareVideoWithApiError() {
         Http::fake([
             'https://api.linkedin.com/v2/assets' => Http::response([
                 'message' => 'Invalid video URL'
@@ -189,8 +174,7 @@ class LinkedInServiceTest extends TestCase
         $service->shareVideo('Test video post', 'https://example.com/video.mp4');
     }
 
-    public function testShareToCompanyPageWithApiError()
-    {
+    public function testShareToCompanyPageWithApiError() {
         Http::fake([
             'https://api.linkedin.com/v2/ugcPosts' => Http::response([
                 'message' => 'Invalid organization URN'
@@ -205,8 +189,7 @@ class LinkedInServiceTest extends TestCase
         $service->shareToCompanyPage('Company post', 'https://example.com');
     }
 
-    public function testGetUserInfoWithApiError()
-    {
+    public function testGetUserInfoWithApiError() {
         Http::fake([
             'https://api.linkedin.com/v2/people/~' => Http::response([
                 'message' => 'Invalid user request'
@@ -221,8 +204,7 @@ class LinkedInServiceTest extends TestCase
         $service->getUserInfo();
     }
 
-    public function testShareToCompanyPageWithoutOrganizationUrn()
-    {
+    public function testShareToCompanyPageWithoutOrganizationUrn() {
         config(['social_media_publisher.linkedin_organization_urn' => null]);
         
         $service = LinkedInService::getInstance();
@@ -233,8 +215,7 @@ class LinkedInServiceTest extends TestCase
         $service->shareToCompanyPage('Company post', 'https://example.com');
     }
 
-    public function testLoggingOnSuccess()
-    {
+    public function testLoggingOnSuccess() {
         Log::shouldReceive('info')
             ->once()
             ->with('LinkedIn post shared successfully', \Mockery::type('array'));
@@ -247,8 +228,7 @@ class LinkedInServiceTest extends TestCase
         $service->share('Test post', 'https://example.com');
     }
 
-    public function testLoggingOnError()
-    {
+    public function testLoggingOnError() {
         Log::shouldReceive('error')
             ->once()
             ->with('Failed to share to LinkedIn', \Mockery::type('array'));
@@ -265,8 +245,7 @@ class LinkedInServiceTest extends TestCase
         $service->share('Test post', 'https://example.com');
     }
 
-    public function testRetryLogic()
-    {
+    public function testRetryLogic() {
         Http::fake([
             'https://api.linkedin.com/v2/ugcPosts' => Http::sequence()
                 ->push(['message' => 'Rate limited'], 429)
@@ -281,8 +260,7 @@ class LinkedInServiceTest extends TestCase
         $this->assertEquals('123', $result['id']);
     }
 
-    public function testTimeoutConfiguration()
-    {
+    public function testTimeoutConfiguration() {
         config(['social_media_publisher.timeout' => 60]);
 
         Http::fake([
@@ -297,8 +275,7 @@ class LinkedInServiceTest extends TestCase
         });
     }
 
-    public function testAssetUploadForImage()
-    {
+    public function testAssetUploadForImage() {
         Http::fake([
             'https://api.linkedin.com/v2/assets' => Http::response([
                 'value' => ['asset' => 'urn:li:digitalmediaAsset:123']
@@ -313,8 +290,7 @@ class LinkedInServiceTest extends TestCase
         $this->assertEquals('456', $result['id']);
     }
 
-    public function testAssetUploadForVideo()
-    {
+    public function testAssetUploadForVideo() {
         Http::fake([
             'https://api.linkedin.com/v2/assets' => Http::response([
                 'value' => ['asset' => 'urn:li:digitalmediaAsset:123']

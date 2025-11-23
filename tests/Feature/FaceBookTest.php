@@ -8,8 +8,7 @@ use Illuminate\Support\Facades\Http;
 
 class FaceBookTest extends TestCase {
 
-    public function testShareImageFacade()
-    {
+    public function testShareImageFacade() {
         Http::fake([
             'https://graph.facebook.com/v20.0/*' => Http::response(['id' => '123'], 200),
         ]);
@@ -20,8 +19,7 @@ class FaceBookTest extends TestCase {
         $this->assertEquals('123', $response['id']);
     }
 
-    public function testSharePostFacade()
-    {
+    public function testSharePostFacade() {
         Http::fake([
             'https://graph.facebook.com/v20.0/*' => Http::response(['id' => '456'], 200),
         ]);

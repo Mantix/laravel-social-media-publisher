@@ -70,7 +70,9 @@ class TelegramService extends SocialMediaService implements ShareInterface, Shar
             throw new SocialMediaException('Telegram connection is missing Bot Token or Chat ID.');
         }
 
-        return new self($botToken, $chatId);
+        $service = new self();
+        $service->setCredentials($botToken, $chatId);
+        return $service;
     }
 
     /* --------------------------------------------------------------------------
@@ -87,6 +89,22 @@ class TelegramService extends SocialMediaService implements ShareInterface, Shar
     public static function verifyBotToken(string $token): array {
         $service = new self($token, 'dummy_chat_id');
         return $service->sendRequest('get', 'getMe');
+    }
+
+    /**
+     * Disconnect from Telegram.
+     * Note: Telegram Bot API doesn't have token revocation.
+     * This method simply returns true as there's no token to revoke.
+     * The connection record should still be deleted from the database.
+     *
+     * @param string $accessToken Not used for Telegram, but kept for consistency
+     * @return bool Always returns true
+     */
+    public static function disconnect(string $accessToken): bool {
+        // Telegram Bot API doesn't support token revocation
+        // The bot token remains valid until manually revoked in BotFather
+        // So we just return true - the connection record deletion is handled elsewhere
+        return true;
     }
 
     /**

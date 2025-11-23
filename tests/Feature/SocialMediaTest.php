@@ -15,10 +15,8 @@ use Mantix\LaravelSocialMediaPublisher\Facades\TikTok;
 use Mantix\LaravelSocialMediaPublisher\Facades\X;
 use Mantix\LaravelSocialMediaPublisher\Facades\YouTube;
 
-class SocialMediaTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class SocialMediaTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
         
         // Set up test configuration
@@ -47,8 +45,7 @@ class SocialMediaTest extends TestCase
         ]);
     }
 
-    public function testUnifiedSocialMediaSharing()
-    {
+    public function testUnifiedSocialMediaSharing() {
         Http::fake([
             'https://graph.facebook.com/v20.0/*' => Http::response(['id' => '123'], 200),
             'https://api.twitter.com/2/*' => Http::response(['data' => ['id' => '456']], 200),
@@ -67,8 +64,7 @@ class SocialMediaTest extends TestCase
         $this->assertEquals(3, $result['total_platforms']);
     }
 
-    public function testShareToAllPlatforms()
-    {
+    public function testShareToAllPlatforms() {
         Http::fake([
             'https://graph.facebook.com/v20.0/*' => Http::response(['id' => '123'], 200),
             'https://api.telegram.org/bot*' => Http::response(['ok' => true], 200),
@@ -83,8 +79,7 @@ class SocialMediaTest extends TestCase
         $this->assertGreaterThan(0, $result['success_count']);
     }
 
-    public function testIndividualPlatformAccess()
-    {
+    public function testIndividualPlatformAccess() {
         Http::fake([
             'https://graph.facebook.com/v20.0/*' => Http::response(['id' => '123'], 200),
         ]);
@@ -95,8 +90,7 @@ class SocialMediaTest extends TestCase
         $this->assertEquals('123', $result['id']);
     }
 
-    public function testFacebookSharing()
-    {
+    public function testFacebookSharing() {
         Http::fake([
             'https://graph.facebook.com/v20.0/*' => Http::response(['id' => '123'], 200),
         ]);
@@ -107,8 +101,7 @@ class SocialMediaTest extends TestCase
         $this->assertEquals('123', $result['id']);
     }
 
-    public function testFacebookImageSharing()
-    {
+    public function testFacebookImageSharing() {
         Http::fake([
             'https://graph.facebook.com/v20.0/*' => Http::response(['id' => '123'], 200),
         ]);
@@ -119,8 +112,7 @@ class SocialMediaTest extends TestCase
         $this->assertEquals('123', $result['id']);
     }
 
-    public function testFacebookPageInsights()
-    {
+    public function testFacebookPageInsights() {
         Http::fake([
             'https://graph.facebook.com/v20.0/*' => Http::response([
                 'data' => [
@@ -139,8 +131,7 @@ class SocialMediaTest extends TestCase
         $this->assertEquals('page_impressions', $result['data'][0]['name']);
     }
 
-    public function testXSharing()
-    {
+    public function testXSharing() {
         Http::fake([
             'https://api.twitter.com/2/*' => Http::response(['data' => ['id' => '456']], 200),
         ]);
@@ -151,8 +142,7 @@ class SocialMediaTest extends TestCase
         $this->assertEquals('456', $result['data']['id']);
     }
 
-    public function testXImageSharing()
-    {
+    public function testXImageSharing() {
         Http::fake([
             'https://api.twitter.com/2/*' => Http::response(['data' => ['id' => '456']], 200),
             'https://upload.twitter.com/1.1/*' => Http::response(['media_id_string' => 'media123'], 200),
@@ -164,8 +154,7 @@ class SocialMediaTest extends TestCase
         $this->assertEquals('456', $result['data']['id']);
     }
 
-    public function testXTimeline()
-    {
+    public function testXTimeline() {
         Http::fake([
             'https://api.twitter.com/2/*' => Http::response([
                 'data' => [
@@ -181,8 +170,7 @@ class SocialMediaTest extends TestCase
         $this->assertCount(2, $result['data']);
     }
 
-    public function testLinkedInSharing()
-    {
+    public function testLinkedInSharing() {
         Http::fake([
             'https://api.linkedin.com/v2/*' => Http::response(['id' => '789'], 200),
         ]);
@@ -193,8 +181,7 @@ class SocialMediaTest extends TestCase
         $this->assertEquals('789', $result['id']);
     }
 
-    public function testLinkedInCompanyPageSharing()
-    {
+    public function testLinkedInCompanyPageSharing() {
         config(['social_media_publisher.linkedin_organization_urn' => 'test_org_urn']);
         
         Http::fake([
@@ -207,8 +194,7 @@ class SocialMediaTest extends TestCase
         $this->assertEquals('789', $result['id']);
     }
 
-    public function testInstagramImageSharing()
-    {
+    public function testInstagramImageSharing() {
         Http::fake([
             'https://graph.facebook.com/v20.0/*' => Http::response(['id' => '123'], 200),
         ]);
@@ -219,8 +205,7 @@ class SocialMediaTest extends TestCase
         $this->assertEquals('123', $result['id']);
     }
 
-    public function testInstagramCarouselSharing()
-    {
+    public function testInstagramCarouselSharing() {
         Http::fake([
             'https://graph.facebook.com/v20.0/*' => Http::response(['id' => '123'], 200),
         ]);
@@ -235,8 +220,7 @@ class SocialMediaTest extends TestCase
         $this->assertEquals('123', $result['id']);
     }
 
-    public function testTikTokVideoSharing()
-    {
+    public function testTikTokVideoSharing() {
         Http::fake([
             'https://open-api.tiktok.com/*' => Http::response(['data' => ['video_id' => 'tiktok123']], 200),
         ]);
@@ -247,8 +231,7 @@ class SocialMediaTest extends TestCase
         $this->assertEquals('tiktok123', $result['data']['video_id']);
     }
 
-    public function testYouTubeVideoSharing()
-    {
+    public function testYouTubeVideoSharing() {
         Http::fake([
             'https://www.googleapis.com/youtube/v3/*' => Http::response(['id' => 'youtube123'], 200),
         ]);
@@ -259,8 +242,7 @@ class SocialMediaTest extends TestCase
         $this->assertEquals('youtube123', $result['id']);
     }
 
-    public function testYouTubeCommunityPost()
-    {
+    public function testYouTubeCommunityPost() {
         Http::fake([
             'https://www.googleapis.com/youtube/v3/*' => Http::response(['id' => 'community123'], 200),
         ]);
@@ -271,8 +253,7 @@ class SocialMediaTest extends TestCase
         $this->assertEquals('community123', $result['id']);
     }
 
-    public function testPinterestImageSharing()
-    {
+    public function testPinterestImageSharing() {
         Http::fake([
             'https://api.pinterest.com/v5/*' => Http::response(['id' => 'pinterest123'], 200),
         ]);
@@ -283,8 +264,7 @@ class SocialMediaTest extends TestCase
         $this->assertEquals('pinterest123', $result['id']);
     }
 
-    public function testPinterestBoardCreation()
-    {
+    public function testPinterestBoardCreation() {
         Http::fake([
             'https://api.pinterest.com/v5/*' => Http::response(['id' => 'board123'], 200),
         ]);
@@ -295,8 +275,7 @@ class SocialMediaTest extends TestCase
         $this->assertEquals('board123', $result['id']);
     }
 
-    public function testTelegramMessageSharing()
-    {
+    public function testTelegramMessageSharing() {
         Http::fake([
             'https://api.telegram.org/bot*' => Http::response(['ok' => true, 'result' => ['message_id' => 123]], 200),
         ]);
@@ -308,8 +287,7 @@ class SocialMediaTest extends TestCase
         $this->assertEquals(123, $result['result']['message_id']);
     }
 
-    public function testTelegramImageSharing()
-    {
+    public function testTelegramImageSharing() {
         Http::fake([
             'https://api.telegram.org/bot*' => Http::response(['ok' => true, 'result' => ['message_id' => 123]], 200),
         ]);
@@ -320,8 +298,7 @@ class SocialMediaTest extends TestCase
         $this->assertTrue($result['ok']);
     }
 
-    public function testTelegramDocumentSharing()
-    {
+    public function testTelegramDocumentSharing() {
         Http::fake([
             'https://api.telegram.org/bot*' => Http::response(['ok' => true, 'result' => ['message_id' => 123]], 200),
         ]);
@@ -332,8 +309,7 @@ class SocialMediaTest extends TestCase
         $this->assertTrue($result['ok']);
     }
 
-    public function testErrorHandling()
-    {
+    public function testErrorHandling() {
         Http::fake([
             'https://graph.facebook.com/v20.0/*' => Http::response(['error' => ['message' => 'Invalid token']], 400),
         ]);
@@ -344,24 +320,21 @@ class SocialMediaTest extends TestCase
         FaceBook::share('Test post', 'https://example.com');
     }
 
-    public function testInputValidation()
-    {
+    public function testInputValidation() {
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('Caption cannot be empty');
 
         FaceBook::share('', 'https://example.com');
     }
 
-    public function testUrlValidation()
-    {
+    public function testUrlValidation() {
         $this->expectException(SocialMediaException::class);
         $this->expectExceptionMessage('Invalid URL provided');
 
         FaceBook::share('Test post', 'invalid-url');
     }
 
-    public function testMultiPlatformErrorHandling()
-    {
+    public function testMultiPlatformErrorHandling() {
         Http::fake([
             'https://graph.facebook.com/v20.0/*' => Http::response(['id' => '123'], 200),
             'https://api.twitter.com/2/*' => Http::response(['error' => ['message' => 'Invalid token']], 401),
@@ -382,8 +355,7 @@ class SocialMediaTest extends TestCase
         $this->assertArrayHasKey('x', $result['errors']);
     }
 
-    public function testPlatformAvailability()
-    {
+    public function testPlatformAvailability() {
         $manager = app(\mantix\LaravelSocialMediaPublisher\Services\SocialMediaManager::class);
         
         $this->assertTrue($manager->isPlatformAvailable('facebook'));
@@ -397,8 +369,7 @@ class SocialMediaTest extends TestCase
         $this->assertFalse($manager->isPlatformAvailable('nonexistent'));
     }
 
-    public function testGetAvailablePlatforms()
-    {
+    public function testGetAvailablePlatforms() {
         $manager = app(\mantix\LaravelSocialMediaPublisher\Services\SocialMediaManager::class);
         $platforms = $manager->getAvailablePlatforms();
 
@@ -414,8 +385,7 @@ class SocialMediaTest extends TestCase
         $this->assertContains('telegram', $platforms);
     }
 
-    public function testLoggingEnabled()
-    {
+    public function testLoggingEnabled() {
         Log::shouldReceive('info')
             ->once()
             ->with('Facebook post shared successfully', \Mockery::type('array'));
@@ -427,8 +397,7 @@ class SocialMediaTest extends TestCase
         FaceBook::share('Test post', 'https://example.com');
     }
 
-    public function testServiceProviderRegistration()
-    {
+    public function testServiceProviderRegistration() {
         $this->assertTrue(app()->bound('mantix\LaravelSocialMediaPublisher\Services\FacebookService'));
         $this->assertTrue(app()->bound('mantix\LaravelSocialMediaPublisher\Services\XService'));
         $this->assertTrue(app()->bound('mantix\LaravelSocialMediaPublisher\Services\LinkedInService'));
@@ -440,8 +409,7 @@ class SocialMediaTest extends TestCase
         $this->assertTrue(app()->bound('mantix\LaravelSocialMediaPublisher\Services\SocialMediaManager'));
     }
 
-    public function testFacadeAliases()
-    {
+    public function testFacadeAliases() {
         $this->assertTrue(app()->bound('facebook'));
         $this->assertTrue(app()->bound('x'));
         $this->assertTrue(app()->bound('linkedin'));

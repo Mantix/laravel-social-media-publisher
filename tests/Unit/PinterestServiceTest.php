@@ -8,10 +8,8 @@ use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class PinterestServiceTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class PinterestServiceTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
         
         config([
@@ -20,16 +18,14 @@ class PinterestServiceTest extends TestCase
         ]);
     }
 
-    public function testPinterestServiceSingleton()
-    {
+    public function testPinterestServiceSingleton() {
         $service1 = PinterestService::getInstance();
         $service2 = PinterestService::getInstance();
         
         $this->assertSame($service1, $service2);
     }
 
-    public function testPinterestServiceWithMissingCredentials()
-    {
+    public function testPinterestServiceWithMissingCredentials() {
         config(['social_media_publisher.pinterest_access_token' => null]);
         
         $this->expectException(SocialMediaException::class);
@@ -38,8 +34,7 @@ class PinterestServiceTest extends TestCase
         PinterestService::getInstance();
     }
 
-    public function testShareImageSuccess()
-    {
+    public function testShareImageSuccess() {
         Http::fake([
             'https://api.pinterest.com/v5/pins' => Http::response(['id' => 'pin123'], 200),
         ]);
@@ -51,8 +46,7 @@ class PinterestServiceTest extends TestCase
         $this->assertEquals('pin123', $result['id']);
     }
 
-    public function testShareVideoSuccess()
-    {
+    public function testShareVideoSuccess() {
         Http::fake([
             'https://api.pinterest.com/v5/pins' => Http::response(['id' => 'pin456'], 200),
         ]);
@@ -64,8 +58,7 @@ class PinterestServiceTest extends TestCase
         $this->assertEquals('pin456', $result['id']);
     }
 
-    public function testCreateBoardSuccess()
-    {
+    public function testCreateBoardSuccess() {
         Http::fake([
             'https://api.pinterest.com/v5/boards' => Http::response(['id' => 'board123'], 200),
         ]);
@@ -77,8 +70,7 @@ class PinterestServiceTest extends TestCase
         $this->assertEquals('board123', $result['id']);
     }
 
-    public function testGetUserInfoSuccess()
-    {
+    public function testGetUserInfoSuccess() {
         Http::fake([
             'https://api.pinterest.com/v5/user_account' => Http::response([
                 'id' => 'user123',
@@ -94,8 +86,7 @@ class PinterestServiceTest extends TestCase
         $this->assertEquals('testuser', $result['username']);
     }
 
-    public function testGetBoardsSuccess()
-    {
+    public function testGetBoardsSuccess() {
         Http::fake([
             'https://api.pinterest.com/v5/boards' => Http::response([
                 'items' => [
@@ -112,8 +103,7 @@ class PinterestServiceTest extends TestCase
         $this->assertCount(2, $result['items']);
     }
 
-    public function testGetBoardPinsSuccess()
-    {
+    public function testGetBoardPinsSuccess() {
         Http::fake([
             'https://api.pinterest.com/v5/boards/test_board_id/pins' => Http::response([
                 'items' => [
@@ -130,8 +120,7 @@ class PinterestServiceTest extends TestCase
         $this->assertCount(2, $result['items']);
     }
 
-    public function testGetPinAnalyticsSuccess()
-    {
+    public function testGetPinAnalyticsSuccess() {
         Http::fake([
             'https://api.pinterest.com/v5/pins/pin123/analytics' => Http::response([
                 'daily_metrics' => [
@@ -147,8 +136,7 @@ class PinterestServiceTest extends TestCase
         $this->assertCount(1, $result['daily_metrics']);
     }
 
-    public function testShareImageWithEmptyCaption()
-    {
+    public function testShareImageWithEmptyCaption() {
         $service = PinterestService::getInstance();
         
         $this->expectException(SocialMediaException::class);
@@ -157,8 +145,7 @@ class PinterestServiceTest extends TestCase
         $service->shareImage('', 'https://example.com/image.jpg');
     }
 
-    public function testShareImageWithCaptionTooLong()
-    {
+    public function testShareImageWithCaptionTooLong() {
         $service = PinterestService::getInstance();
         $longCaption = str_repeat('a', 2201); // Over 2200 character limit
         
@@ -168,8 +155,7 @@ class PinterestServiceTest extends TestCase
         $service->shareImage($longCaption, 'https://example.com/image.jpg');
     }
 
-    public function testShareImageWithInvalidUrl()
-    {
+    public function testShareImageWithInvalidUrl() {
         $service = PinterestService::getInstance();
         
         $this->expectException(SocialMediaException::class);
@@ -178,8 +164,7 @@ class PinterestServiceTest extends TestCase
         $service->shareImage('Test pin', 'invalid-url');
     }
 
-    public function testCreateBoardWithEmptyName()
-    {
+    public function testCreateBoardWithEmptyName() {
         $service = PinterestService::getInstance();
         
         $this->expectException(SocialMediaException::class);
@@ -188,8 +173,7 @@ class PinterestServiceTest extends TestCase
         $service->createBoard('', 'Description');
     }
 
-    public function testCreateBoardWithNameTooLong()
-    {
+    public function testCreateBoardWithNameTooLong() {
         $service = PinterestService::getInstance();
         $longName = str_repeat('a', 181); // Over 180 character limit
         
@@ -199,8 +183,7 @@ class PinterestServiceTest extends TestCase
         $service->createBoard($longName, 'Description');
     }
 
-    public function testShareImageWithApiError()
-    {
+    public function testShareImageWithApiError() {
         Http::fake([
             'https://api.pinterest.com/v5/pins' => Http::response([
                 'message' => 'Invalid access token'
@@ -215,8 +198,7 @@ class PinterestServiceTest extends TestCase
         $service->shareImage('Test Pinterest pin', 'https://example.com/image.jpg');
     }
 
-    public function testShareVideoWithApiError()
-    {
+    public function testShareVideoWithApiError() {
         Http::fake([
             'https://api.pinterest.com/v5/pins' => Http::response([
                 'message' => 'Invalid video URL'
@@ -231,8 +213,7 @@ class PinterestServiceTest extends TestCase
         $service->shareVideo('Test Pinterest video', 'https://example.com/video.mp4');
     }
 
-    public function testCreateBoardWithApiError()
-    {
+    public function testCreateBoardWithApiError() {
         Http::fake([
             'https://api.pinterest.com/v5/boards' => Http::response([
                 'message' => 'Invalid board data'
@@ -247,8 +228,7 @@ class PinterestServiceTest extends TestCase
         $service->createBoard('Test Board', 'Description');
     }
 
-    public function testGetUserInfoWithApiError()
-    {
+    public function testGetUserInfoWithApiError() {
         Http::fake([
             'https://api.pinterest.com/v5/user_account' => Http::response([
                 'message' => 'Invalid user request'
@@ -263,8 +243,7 @@ class PinterestServiceTest extends TestCase
         $service->getUserInfo();
     }
 
-    public function testGetBoardsWithApiError()
-    {
+    public function testGetBoardsWithApiError() {
         Http::fake([
             'https://api.pinterest.com/v5/boards' => Http::response([
                 'message' => 'Invalid boards request'
@@ -279,8 +258,7 @@ class PinterestServiceTest extends TestCase
         $service->getBoards(25);
     }
 
-    public function testGetBoardPinsWithApiError()
-    {
+    public function testGetBoardPinsWithApiError() {
         Http::fake([
             'https://api.pinterest.com/v5/boards/test_board_id/pins' => Http::response([
                 'message' => 'Invalid board ID'
@@ -295,8 +273,7 @@ class PinterestServiceTest extends TestCase
         $service->getBoardPins('test_board_id', 25);
     }
 
-    public function testGetPinAnalyticsWithApiError()
-    {
+    public function testGetPinAnalyticsWithApiError() {
         Http::fake([
             'https://api.pinterest.com/v5/pins/pin123/analytics' => Http::response([
                 'message' => 'Invalid pin ID'
@@ -311,8 +288,7 @@ class PinterestServiceTest extends TestCase
         $service->getPinAnalytics('pin123');
     }
 
-    public function testLoggingOnSuccess()
-    {
+    public function testLoggingOnSuccess() {
         Log::shouldReceive('info')
             ->once()
             ->with('Pinterest image post shared successfully', \Mockery::type('array'));
@@ -325,8 +301,7 @@ class PinterestServiceTest extends TestCase
         $service->shareImage('Test Pinterest pin', 'https://example.com/image.jpg');
     }
 
-    public function testLoggingOnError()
-    {
+    public function testLoggingOnError() {
         Log::shouldReceive('error')
             ->once()
             ->with('Failed to share image to Pinterest', \Mockery::type('array'));
@@ -343,8 +318,7 @@ class PinterestServiceTest extends TestCase
         $service->shareImage('Test Pinterest pin', 'https://example.com/image.jpg');
     }
 
-    public function testRetryLogic()
-    {
+    public function testRetryLogic() {
         Http::fake([
             'https://api.pinterest.com/v5/pins' => Http::sequence()
                 ->push(['message' => 'Rate limited'], 429)
@@ -359,8 +333,7 @@ class PinterestServiceTest extends TestCase
         $this->assertEquals('pin123', $result['id']);
     }
 
-    public function testTimeoutConfiguration()
-    {
+    public function testTimeoutConfiguration() {
         config(['social_media_publisher.timeout' => 60]);
 
         Http::fake([
@@ -375,8 +348,7 @@ class PinterestServiceTest extends TestCase
         });
     }
 
-    public function testCreateBoardWithPrivacy()
-    {
+    public function testCreateBoardWithPrivacy() {
         Http::fake([
             'https://api.pinterest.com/v5/boards' => Http::response(['id' => 'board123'], 200),
         ]);
@@ -388,8 +360,7 @@ class PinterestServiceTest extends TestCase
         $this->assertEquals('board123', $result['id']);
     }
 
-    public function testGetBoardsWithPagination()
-    {
+    public function testGetBoardsWithPagination() {
         Http::fake([
             'https://api.pinterest.com/v5/boards' => Http::response([
                 'items' => [
@@ -406,8 +377,7 @@ class PinterestServiceTest extends TestCase
         $this->assertArrayHasKey('bookmark', $result);
     }
 
-    public function testGetBoardPinsWithMaxCount()
-    {
+    public function testGetBoardPinsWithMaxCount() {
         Http::fake([
             'https://api.pinterest.com/v5/boards/test_board_id/pins' => Http::response([
                 'items' => [

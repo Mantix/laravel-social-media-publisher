@@ -69,7 +69,9 @@ class PinterestService extends SocialMediaService implements ShareInterface, Sha
             throw new SocialMediaException('Pinterest connection is missing an access token.');
         }
 
-        return new self($accessToken, $boardId);
+        $service = new self();
+        $service->setCredentials($accessToken, $boardId);
+        return $service;
     }
 
     /* --------------------------------------------------------------------------
@@ -136,6 +138,32 @@ class PinterestService extends SocialMediaService implements ShareInterface, Sha
         $profile = $tempService->getUserInfo();
 
         return array_merge($tokenData, ['profile' => $profile]);
+    }
+
+    /**
+     * Revoke an access token and disconnect from Pinterest.
+     *
+     * @param string $accessToken
+     * @return bool
+     * @throws SocialMediaException
+     */
+    public static function disconnect(string $accessToken): bool {
+        $clientId = config('social_media_publisher.pinterest_client_id');
+        $clientSecret = config('social_media_publisher.pinterest_client_secret');
+
+        if (!$clientId || !$clientSecret) {
+            throw new SocialMediaException('Pinterest Client ID and Secret are required for token revocation.');
+        }
+
+        // Pinterest uses DELETE /v5/oauth/token endpoint
+        $response = Http::withHeaders([
+            'Authorization' => 'Basic ' . base64_encode($clientId . ':' . $clientSecret),
+        ])->delete(self::API_BASE_URL . '/oauth/token', [
+            'access_token' => $accessToken,
+        ]);
+
+        // Pinterest returns 204 on success, or 400 if token is already invalid
+        return $response->status() === 204 || $response->status() === 400;
     }
 
     /**

@@ -6,12 +6,10 @@ use Orchestra\Testbench\TestCase as OrchestraTestCase;
 use Mantix\LaravelSocialMediaPublisher\Tests\Helpers\TestHelpers;
 use Illuminate\Support\Facades\Schema;
 
-abstract class TestCase extends OrchestraTestCase
-{
+abstract class TestCase extends OrchestraTestCase {
     use TestHelpers;
 
-    protected function setUp(): void
-    {
+    protected function setUp(): void {
         parent::setUp();
         
         // Set up test configuration
@@ -44,8 +42,7 @@ abstract class TestCase extends OrchestraTestCase
         $this->setUpDatabase();
     }
 
-    protected function setUpDatabase(): void
-    {
+    protected function setUpDatabase(): void {
         Schema::create('social_media_connections', function ($table) {
             $table->id();
             $table->morphs('owner');
@@ -66,15 +63,13 @@ abstract class TestCase extends OrchestraTestCase
         });
     }
 
-    protected function getPackageProviders($app)
-    {
+    protected function getPackageProviders($app) {
         return [
             \mantix\LaravelSocialMediaPublisher\SocialShareServiceProvider::class,
         ];
     }
 
-    protected function getEnvironmentSetUp($app)
-    {
+    protected function getEnvironmentSetUp($app) {
         $app['config']->set('database.default', 'testing');
         $app['config']->set('database.connections.testing', [
             'driver' => 'sqlite',

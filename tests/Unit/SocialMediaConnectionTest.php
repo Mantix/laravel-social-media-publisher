@@ -5,10 +5,8 @@ namespace Mantix\LaravelSocialMediaPublisher\Tests\Unit;
 use Illuminate\Support\Facades\Crypt;
 use Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection;
 
-class SocialMediaConnectionTest extends TestCase
-{
-    public function testConnectionCreation()
-    {
+class SocialMediaConnectionTest extends TestCase {
+    public function testConnectionCreation() {
         $connection = $this->createFacebookConnection();
 
         $this->assertInstanceOf(SocialMediaConnection::class, $connection);
@@ -17,8 +15,7 @@ class SocialMediaConnectionTest extends TestCase
         $this->assertTrue($connection->is_active);
     }
 
-    public function testTokenEncryption()
-    {
+    public function testTokenEncryption() {
         $connection = $this->createConnection([
             'access_token' => 'test_token',
         ]);
@@ -30,8 +27,7 @@ class SocialMediaConnectionTest extends TestCase
         $this->assertEquals('test_token', $connection->getDecryptedAccessToken());
     }
 
-    public function testRefreshTokenEncryption()
-    {
+    public function testRefreshTokenEncryption() {
         $connection = $this->createConnection([
             'refresh_token' => 'test_refresh_token',
         ]);
@@ -40,16 +36,14 @@ class SocialMediaConnectionTest extends TestCase
         $this->assertEquals('test_refresh_token', $connection->getDecryptedRefreshToken());
     }
 
-    public function testTokenSecretEncryption()
-    {
+    public function testTokenSecretEncryption() {
         $connection = $this->createXConnection();
 
         $this->assertNotEquals('test_token_secret', $connection->getAttributes()['token_secret']);
         $this->assertEquals('test_token_secret', $connection->getDecryptedTokenSecret());
     }
 
-    public function testIsExpired()
-    {
+    public function testIsExpired() {
         $expiredConnection = $this->createConnection([
             'expires_at' => now()->subDay(),
         ]);
@@ -63,8 +57,7 @@ class SocialMediaConnectionTest extends TestCase
         $this->assertFalse($activeConnection->isExpired());
     }
 
-    public function testIsExpiredWithNoExpiration()
-    {
+    public function testIsExpiredWithNoExpiration() {
         $connection = $this->createConnection([
             'expires_at' => null,
         ]);
@@ -72,8 +65,7 @@ class SocialMediaConnectionTest extends TestCase
         $this->assertFalse($connection->isExpired());
     }
 
-    public function testActiveScope()
-    {
+    public function testActiveScope() {
         $this->createConnection(['is_active' => true]);
         $this->createConnection(['is_active' => false]);
         $this->createConnection(['is_active' => true]);
@@ -84,8 +76,7 @@ class SocialMediaConnectionTest extends TestCase
         $this->assertTrue($activeConnections->every(fn($c) => $c->is_active));
     }
 
-    public function testForPlatformScope()
-    {
+    public function testForPlatformScope() {
         $this->createFacebookConnection();
         $this->createLinkedInConnection();
         $this->createFacebookConnection();
@@ -96,8 +87,7 @@ class SocialMediaConnectionTest extends TestCase
         $this->assertTrue($facebookConnections->every(fn($c) => $c->platform === 'facebook'));
     }
 
-    public function testForOwnerScopeWithModel()
-    {
+    public function testForOwnerScopeWithModel() {
         $user1 = $this->createTestUser(1);
         $user2 = $this->createTestUser(2);
 
@@ -111,8 +101,7 @@ class SocialMediaConnectionTest extends TestCase
         $this->assertTrue($user1Connections->every(fn($c) => $c->owner_id === 1));
     }
 
-    public function testForOwnerScopeWithClassName()
-    {
+    public function testForOwnerScopeWithClassName() {
         $user1 = $this->createTestUser(1);
         $user2 = $this->createTestUser(2);
 
@@ -125,8 +114,7 @@ class SocialMediaConnectionTest extends TestCase
         $this->assertEquals(1, $connections->first()->owner_id);
     }
 
-    public function testPolymorphicOwnerRelationship()
-    {
+    public function testPolymorphicOwnerRelationship() {
         $user = $this->createTestUser(1);
         $company = $this->createTestCompany(1);
 
@@ -140,8 +128,7 @@ class SocialMediaConnectionTest extends TestCase
         $this->assertEquals(1, $companyConnection->owner_id);
     }
 
-    public function testMetadataJsonCast()
-    {
+    public function testMetadataJsonCast() {
         $metadata = ['page_id' => '123', 'extra' => 'data'];
         $connection = $this->createConnection(['metadata' => $metadata]);
 
@@ -150,8 +137,7 @@ class SocialMediaConnectionTest extends TestCase
         $this->assertEquals('data', $connection->metadata['extra']);
     }
 
-    public function testExpiresAtDateTimeCast()
-    {
+    public function testExpiresAtDateTimeCast() {
         $expiresAt = now()->addDays(30);
         $connection = $this->createConnection(['expires_at' => $expiresAt]);
 
@@ -159,8 +145,7 @@ class SocialMediaConnectionTest extends TestCase
         $this->assertEquals($expiresAt->format('Y-m-d H:i:s'), $connection->expires_at->format('Y-m-d H:i:s'));
     }
 
-    public function testIsActiveBooleanCast()
-    {
+    public function testIsActiveBooleanCast() {
         $connection = $this->createConnection(['is_active' => 1]);
         $this->assertTrue($connection->is_active);
 

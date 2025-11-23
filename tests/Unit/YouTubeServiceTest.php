@@ -8,10 +8,8 @@ use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class YouTubeServiceTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class YouTubeServiceTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
         
         config([
@@ -21,16 +19,14 @@ class YouTubeServiceTest extends TestCase
         ]);
     }
 
-    public function testYouTubeServiceSingleton()
-    {
+    public function testYouTubeServiceSingleton() {
         $service1 = YouTubeService::getInstance();
         $service2 = YouTubeService::getInstance();
         
         $this->assertSame($service1, $service2);
     }
 
-    public function testYouTubeServiceWithMissingCredentials()
-    {
+    public function testYouTubeServiceWithMissingCredentials() {
         config(['social_media_publisher.youtube_api_key' => null]);
         
         $this->expectException(SocialMediaException::class);
@@ -39,8 +35,7 @@ class YouTubeServiceTest extends TestCase
         YouTubeService::getInstance();
     }
 
-    public function testShareVideoSuccess()
-    {
+    public function testShareVideoSuccess() {
         Http::fake([
             'https://www.googleapis.com/youtube/v3/videos' => Http::response(['id' => 'youtube123'], 200),
         ]);
@@ -52,8 +47,7 @@ class YouTubeServiceTest extends TestCase
         $this->assertEquals('youtube123', $result['id']);
     }
 
-    public function testCreateCommunityPostSuccess()
-    {
+    public function testCreateCommunityPostSuccess() {
         Http::fake([
             'https://www.googleapis.com/youtube/v3/activities' => Http::response(['id' => 'community123'], 200),
         ]);
@@ -65,8 +59,7 @@ class YouTubeServiceTest extends TestCase
         $this->assertEquals('community123', $result['id']);
     }
 
-    public function testGetChannelInfoSuccess()
-    {
+    public function testGetChannelInfoSuccess() {
         Http::fake([
             'https://www.googleapis.com/youtube/v3/channels' => Http::response([
                 'items' => [
@@ -89,8 +82,7 @@ class YouTubeServiceTest extends TestCase
         $this->assertEquals('Test Channel', $result['items'][0]['snippet']['title']);
     }
 
-    public function testGetChannelVideosSuccess()
-    {
+    public function testGetChannelVideosSuccess() {
         Http::fake([
             'https://www.googleapis.com/youtube/v3/search' => Http::response([
                 'items' => [
@@ -107,8 +99,7 @@ class YouTubeServiceTest extends TestCase
         $this->assertCount(2, $result['items']);
     }
 
-    public function testGetVideoAnalyticsSuccess()
-    {
+    public function testGetVideoAnalyticsSuccess() {
         Http::fake([
             'https://www.googleapis.com/youtube/v3/videos' => Http::response([
                 'items' => [
@@ -132,8 +123,7 @@ class YouTubeServiceTest extends TestCase
         $this->assertEquals('1000', $result['items'][0]['statistics']['viewCount']);
     }
 
-    public function testShareVideoWithEmptyTitle()
-    {
+    public function testShareVideoWithEmptyTitle() {
         $service = YouTubeService::getInstance();
         
         $this->expectException(SocialMediaException::class);
@@ -142,8 +132,7 @@ class YouTubeServiceTest extends TestCase
         $service->shareVideo('', 'https://example.com/video.mp4');
     }
 
-    public function testShareVideoWithTitleTooLong()
-    {
+    public function testShareVideoWithTitleTooLong() {
         $service = YouTubeService::getInstance();
         $longTitle = str_repeat('a', 101); // Over 100 character limit
         
@@ -153,8 +142,7 @@ class YouTubeServiceTest extends TestCase
         $service->shareVideo($longTitle, 'https://example.com/video.mp4');
     }
 
-    public function testShareVideoWithInvalidUrl()
-    {
+    public function testShareVideoWithInvalidUrl() {
         $service = YouTubeService::getInstance();
         
         $this->expectException(SocialMediaException::class);
@@ -163,8 +151,7 @@ class YouTubeServiceTest extends TestCase
         $service->shareVideo('Test video', 'invalid-url');
     }
 
-    public function testCreateCommunityPostWithEmptyContent()
-    {
+    public function testCreateCommunityPostWithEmptyContent() {
         $service = YouTubeService::getInstance();
         
         $this->expectException(SocialMediaException::class);
@@ -173,8 +160,7 @@ class YouTubeServiceTest extends TestCase
         $service->createCommunityPost('', 'https://example.com');
     }
 
-    public function testCreateCommunityPostWithContentTooLong()
-    {
+    public function testCreateCommunityPostWithContentTooLong() {
         $service = YouTubeService::getInstance();
         $longContent = str_repeat('a', 2001); // Over 2000 character limit
         
@@ -184,8 +170,7 @@ class YouTubeServiceTest extends TestCase
         $service->createCommunityPost($longContent, 'https://example.com');
     }
 
-    public function testShareVideoWithApiError()
-    {
+    public function testShareVideoWithApiError() {
         Http::fake([
             'https://www.googleapis.com/youtube/v3/videos' => Http::response([
                 'error' => ['message' => 'Invalid access token']
@@ -200,8 +185,7 @@ class YouTubeServiceTest extends TestCase
         $service->shareVideo('Test YouTube video', 'https://example.com/video.mp4');
     }
 
-    public function testCreateCommunityPostWithApiError()
-    {
+    public function testCreateCommunityPostWithApiError() {
         Http::fake([
             'https://www.googleapis.com/youtube/v3/activities' => Http::response([
                 'error' => ['message' => 'Invalid channel ID']
@@ -216,8 +200,7 @@ class YouTubeServiceTest extends TestCase
         $service->createCommunityPost('Test community post', 'https://example.com');
     }
 
-    public function testGetChannelInfoWithApiError()
-    {
+    public function testGetChannelInfoWithApiError() {
         Http::fake([
             'https://www.googleapis.com/youtube/v3/channels' => Http::response([
                 'error' => ['message' => 'Invalid channel request']
@@ -232,8 +215,7 @@ class YouTubeServiceTest extends TestCase
         $service->getChannelInfo();
     }
 
-    public function testGetChannelVideosWithApiError()
-    {
+    public function testGetChannelVideosWithApiError() {
         Http::fake([
             'https://www.googleapis.com/youtube/v3/search' => Http::response([
                 'error' => ['message' => 'Invalid search request']
@@ -248,8 +230,7 @@ class YouTubeServiceTest extends TestCase
         $service->getChannelVideos(25);
     }
 
-    public function testGetVideoAnalyticsWithApiError()
-    {
+    public function testGetVideoAnalyticsWithApiError() {
         Http::fake([
             'https://www.googleapis.com/youtube/v3/videos' => Http::response([
                 'error' => ['message' => 'Invalid video ID']
@@ -264,8 +245,7 @@ class YouTubeServiceTest extends TestCase
         $service->getVideoAnalytics('invalid_video_id');
     }
 
-    public function testLoggingOnSuccess()
-    {
+    public function testLoggingOnSuccess() {
         Log::shouldReceive('info')
             ->once()
             ->with('YouTube video post shared successfully', \Mockery::type('array'));
@@ -278,8 +258,7 @@ class YouTubeServiceTest extends TestCase
         $service->shareVideo('Test YouTube video', 'https://example.com/video.mp4');
     }
 
-    public function testLoggingOnError()
-    {
+    public function testLoggingOnError() {
         Log::shouldReceive('error')
             ->once()
             ->with('Failed to share video to YouTube', \Mockery::type('array'));
@@ -296,8 +275,7 @@ class YouTubeServiceTest extends TestCase
         $service->shareVideo('Test YouTube video', 'https://example.com/video.mp4');
     }
 
-    public function testRetryLogic()
-    {
+    public function testRetryLogic() {
         Http::fake([
             'https://www.googleapis.com/youtube/v3/videos' => Http::sequence()
                 ->push(['error' => ['message' => 'Rate limited']], 429)
@@ -312,8 +290,7 @@ class YouTubeServiceTest extends TestCase
         $this->assertEquals('youtube123', $result['id']);
     }
 
-    public function testTimeoutConfiguration()
-    {
+    public function testTimeoutConfiguration() {
         config(['social_media_publisher.timeout' => 60]);
 
         Http::fake([
@@ -328,8 +305,7 @@ class YouTubeServiceTest extends TestCase
         });
     }
 
-    public function testVideoUploadWithMetadata()
-    {
+    public function testVideoUploadWithMetadata() {
         Http::fake([
             'https://www.googleapis.com/youtube/v3/videos' => Http::response(['id' => 'youtube123'], 200),
         ]);
@@ -341,8 +317,7 @@ class YouTubeServiceTest extends TestCase
         $this->assertEquals('youtube123', $result['id']);
     }
 
-    public function testGetChannelVideosWithMaxResults()
-    {
+    public function testGetChannelVideosWithMaxResults() {
         Http::fake([
             'https://www.googleapis.com/youtube/v3/search' => Http::response([
                 'items' => [
@@ -358,8 +333,7 @@ class YouTubeServiceTest extends TestCase
         $this->assertCount(1, $result['items']);
     }
 
-    public function testGetVideoAnalyticsWithMultipleVideos()
-    {
+    public function testGetVideoAnalyticsWithMultipleVideos() {
         Http::fake([
             'https://www.googleapis.com/youtube/v3/videos' => Http::response([
                 'items' => [

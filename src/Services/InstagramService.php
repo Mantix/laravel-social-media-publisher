@@ -71,7 +71,9 @@ class InstagramService extends SocialMediaService implements ShareInterface, Sha
             throw new SocialMediaException('Instagram connection is missing credentials.');
         }
 
-        return new self($token, $accountId);
+        $service = new self();
+        $service->setCredentials($token, $accountId);
+        return $service;
     }
 
     /* --------------------------------------------------------------------------
@@ -94,6 +96,19 @@ class InstagramService extends SocialMediaService implements ShareInterface, Sha
     ): string {
         // Reuse Facebook Service logic or config, as Instagram uses Facebook OAuth
         return FacebookService::getAuthorizationUrl($redirectUri, $scopes, $state);
+    }
+
+    /**
+     * Revoke an access token and disconnect from Instagram.
+     * Instagram uses Facebook OAuth, so we use Facebook's revocation endpoint.
+     *
+     * @param string $accessToken
+     * @return bool
+     * @throws SocialMediaException
+     */
+    public static function disconnect(string $accessToken): bool {
+        // Instagram uses Facebook OAuth, so use Facebook's disconnect method
+        return FacebookService::disconnect($accessToken);
     }
 
     /**

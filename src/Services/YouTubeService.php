@@ -62,7 +62,9 @@ class YouTubeService extends SocialMediaService implements ShareInterface, Share
             throw new SocialMediaException('YouTube connection is missing Access Token.');
         }
 
-        return new self($token);
+        $service = new self();
+        $service->setCredentials($token);
+        return $service;
     }
 
     /* --------------------------------------------------------------------------
@@ -154,6 +156,23 @@ class YouTubeService extends SocialMediaService implements ShareInterface, Share
         }
 
         return $response->json();
+    }
+
+    /**
+     * Revoke an access token and disconnect from YouTube.
+     *
+     * @param string $accessToken
+     * @return bool
+     * @throws SocialMediaException
+     */
+    public static function disconnect(string $accessToken): bool {
+        // Google OAuth revocation endpoint
+        $response = Http::asForm()->post('https://oauth2.googleapis.com/revoke', [
+            'token' => $accessToken,
+        ]);
+
+        // Google returns 200 on success, or 400 if token is already invalid
+        return $response->status() === 200 || $response->status() === 400;
     }
 
     /* --------------------------------------------------------------------------

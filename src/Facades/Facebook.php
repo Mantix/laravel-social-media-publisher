@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Facade;
  *
  * @method static string getAuthorizationUrl(string $redirectUri, array $scopes = [], ?string $state = null)
  * @method static array handleCallback(string $code, string $redirectUri)
+ * @method static bool disconnect(string $accessToken)
  * @method static \Mantix\LaravelSocialMediaPublisher\Services\FacebookService forConnection(\Mantix\LaravelSocialMediaPublisher\Models\SocialMediaConnection $connection)
  *
  * @see \Mantix\LaravelSocialMediaPublisher\Services\FacebookService

@@ -8,10 +8,8 @@ use Mantix\LaravelSocialMediaPublisher\Exceptions\SocialMediaException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class TelegramServiceTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class TelegramServiceTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
         
         config([
@@ -20,16 +18,14 @@ class TelegramServiceTest extends TestCase
         ]);
     }
 
-    public function testTelegramServiceSingleton()
-    {
+    public function testTelegramServiceSingleton() {
         $service1 = TelegramService::getInstance();
         $service2 = TelegramService::getInstance();
         
         $this->assertSame($service1, $service2);
     }
 
-    public function testTelegramServiceWithMissingCredentials()
-    {
+    public function testTelegramServiceWithMissingCredentials() {
         config(['social_media_publisher.telegram_bot_token' => null]);
         
         $this->expectException(SocialMediaException::class);
@@ -38,8 +34,7 @@ class TelegramServiceTest extends TestCase
         TelegramService::getInstance();
     }
 
-    public function testShareSuccess()
-    {
+    public function testShareSuccess() {
         Http::fake([
             'https://api.telegram.org/bot*' => Http::response([
                 'ok' => true,
@@ -55,8 +50,7 @@ class TelegramServiceTest extends TestCase
         $this->assertEquals(123, $result['result']['message_id']);
     }
 
-    public function testShareImageSuccess()
-    {
+    public function testShareImageSuccess() {
         Http::fake([
             'https://api.telegram.org/bot*' => Http::response([
                 'ok' => true,
@@ -72,8 +66,7 @@ class TelegramServiceTest extends TestCase
         $this->assertEquals(456, $result['result']['message_id']);
     }
 
-    public function testShareVideoSuccess()
-    {
+    public function testShareVideoSuccess() {
         Http::fake([
             'https://api.telegram.org/bot*' => Http::response([
                 'ok' => true,
@@ -89,8 +82,7 @@ class TelegramServiceTest extends TestCase
         $this->assertEquals(789, $result['result']['message_id']);
     }
 
-    public function testShareDocumentSuccess()
-    {
+    public function testShareDocumentSuccess() {
         Http::fake([
             'https://api.telegram.org/bot*' => Http::response([
                 'ok' => true,
@@ -106,8 +98,7 @@ class TelegramServiceTest extends TestCase
         $this->assertEquals(101, $result['result']['message_id']);
     }
 
-    public function testGetUpdatesSuccess()
-    {
+    public function testGetUpdatesSuccess() {
         Http::fake([
             'https://api.telegram.org/bot*' => Http::response([
                 'ok' => true,
@@ -126,8 +117,7 @@ class TelegramServiceTest extends TestCase
         $this->assertCount(2, $result['result']);
     }
 
-    public function testShareWithEmptyMessage()
-    {
+    public function testShareWithEmptyMessage() {
         $service = TelegramService::getInstance();
         
         $this->expectException(SocialMediaException::class);
@@ -136,8 +126,7 @@ class TelegramServiceTest extends TestCase
         $service->share('', 'https://example.com');
     }
 
-    public function testShareWithMessageTooLong()
-    {
+    public function testShareWithMessageTooLong() {
         $service = TelegramService::getInstance();
         $longMessage = str_repeat('a', 4097); // Over 4096 character limit
         
@@ -147,8 +136,7 @@ class TelegramServiceTest extends TestCase
         $service->share($longMessage, 'https://example.com');
     }
 
-    public function testShareWithInvalidUrl()
-    {
+    public function testShareWithInvalidUrl() {
         $service = TelegramService::getInstance();
         
         $this->expectException(SocialMediaException::class);
@@ -157,8 +145,7 @@ class TelegramServiceTest extends TestCase
         $service->share('Test message', 'invalid-url');
     }
 
-    public function testShareImageWithEmptyCaption()
-    {
+    public function testShareImageWithEmptyCaption() {
         $service = TelegramService::getInstance();
         
         $this->expectException(SocialMediaException::class);
@@ -167,8 +154,7 @@ class TelegramServiceTest extends TestCase
         $service->shareImage('', 'https://example.com/image.jpg');
     }
 
-    public function testShareVideoWithEmptyCaption()
-    {
+    public function testShareVideoWithEmptyCaption() {
         $service = TelegramService::getInstance();
         
         $this->expectException(SocialMediaException::class);
@@ -177,8 +163,7 @@ class TelegramServiceTest extends TestCase
         $service->shareVideo('', 'https://example.com/video.mp4');
     }
 
-    public function testShareDocumentWithEmptyCaption()
-    {
+    public function testShareDocumentWithEmptyCaption() {
         $service = TelegramService::getInstance();
         
         $this->expectException(SocialMediaException::class);
@@ -187,8 +172,7 @@ class TelegramServiceTest extends TestCase
         $service->shareDocument('', 'https://example.com/document.pdf');
     }
 
-    public function testShareWithApiError()
-    {
+    public function testShareWithApiError() {
         Http::fake([
             'https://api.telegram.org/bot*' => Http::response([
                 'ok' => false,
@@ -204,8 +188,7 @@ class TelegramServiceTest extends TestCase
         $service->share('Test message', 'https://example.com');
     }
 
-    public function testShareImageWithApiError()
-    {
+    public function testShareImageWithApiError() {
         Http::fake([
             'https://api.telegram.org/bot*' => Http::response([
                 'ok' => false,
@@ -221,8 +204,7 @@ class TelegramServiceTest extends TestCase
         $service->shareImage('Test image', 'https://example.com/image.jpg');
     }
 
-    public function testShareVideoWithApiError()
-    {
+    public function testShareVideoWithApiError() {
         Http::fake([
             'https://api.telegram.org/bot*' => Http::response([
                 'ok' => false,
@@ -238,8 +220,7 @@ class TelegramServiceTest extends TestCase
         $service->shareVideo('Test video', 'https://example.com/video.mp4');
     }
 
-    public function testShareDocumentWithApiError()
-    {
+    public function testShareDocumentWithApiError() {
         Http::fake([
             'https://api.telegram.org/bot*' => Http::response([
                 'ok' => false,
@@ -255,8 +236,7 @@ class TelegramServiceTest extends TestCase
         $service->shareDocument('Test document', 'https://example.com/document.pdf');
     }
 
-    public function testGetUpdatesWithApiError()
-    {
+    public function testGetUpdatesWithApiError() {
         Http::fake([
             'https://api.telegram.org/bot*' => Http::response([
                 'ok' => false,
@@ -272,8 +252,7 @@ class TelegramServiceTest extends TestCase
         $service->getUpdates();
     }
 
-    public function testLoggingOnSuccess()
-    {
+    public function testLoggingOnSuccess() {
         Log::shouldReceive('info')
             ->once()
             ->with('Telegram message sent successfully', \Mockery::type('array'));
@@ -289,8 +268,7 @@ class TelegramServiceTest extends TestCase
         $service->share('Test message', 'https://example.com');
     }
 
-    public function testLoggingOnError()
-    {
+    public function testLoggingOnError() {
         Log::shouldReceive('error')
             ->once()
             ->with('Failed to share to Telegram', \Mockery::type('array'));
@@ -308,8 +286,7 @@ class TelegramServiceTest extends TestCase
         $service->share('Test message', 'https://example.com');
     }
 
-    public function testRetryLogic()
-    {
+    public function testRetryLogic() {
         Http::fake([
             'https://api.telegram.org/bot*' => Http::sequence()
                 ->push(['ok' => false, 'description' => 'Rate limited'], 429)
@@ -325,8 +302,7 @@ class TelegramServiceTest extends TestCase
         $this->assertEquals(123, $result['result']['message_id']);
     }
 
-    public function testTimeoutConfiguration()
-    {
+    public function testTimeoutConfiguration() {
         config(['social_media_publisher.timeout' => 60]);
 
         Http::fake([
@@ -344,8 +320,7 @@ class TelegramServiceTest extends TestCase
         });
     }
 
-    public function testShareWithMarkdown()
-    {
+    public function testShareWithMarkdown() {
         Http::fake([
             'https://api.telegram.org/bot*' => Http::response([
                 'ok' => true,
@@ -360,8 +335,7 @@ class TelegramServiceTest extends TestCase
         $this->assertTrue($result['ok']);
     }
 
-    public function testShareWithHtml()
-    {
+    public function testShareWithHtml() {
         Http::fake([
             'https://api.telegram.org/bot*' => Http::response([
                 'ok' => true,
@@ -376,8 +350,7 @@ class TelegramServiceTest extends TestCase
         $this->assertTrue($result['ok']);
     }
 
-    public function testGetUpdatesWithOffset()
-    {
+    public function testGetUpdatesWithOffset() {
         Http::fake([
             'https://api.telegram.org/bot*' => Http::response([
                 'ok' => true,
@@ -392,8 +365,7 @@ class TelegramServiceTest extends TestCase
         $this->assertTrue($result['ok']);
     }
 
-    public function testShareWithCustomChatId()
-    {
+    public function testShareWithCustomChatId() {
         Http::fake([
             'https://api.telegram.org/bot*' => Http::response([
                 'ok' => true,
